@@ -52,8 +52,10 @@ import { useRouter } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 
@@ -63,8 +65,14 @@ const form = reactive({
 })
 
 const rules: FormRules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 2, max: 64, message: '用户名长度 2-64 个字符', trigger: 'blur' },
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, max: 128, message: '密码长度 6-128 个字符', trigger: 'blur' },
+  ],
 }
 
 async function handleLogin() {
@@ -73,11 +81,15 @@ async function handleLogin() {
 
   loading.value = true
   try {
-    // TODO: Call auth API (HY-278)
-    ElMessage.info('登录功能待实现')
-    // Temporary: simulate login
-    localStorage.setItem('readbud_token', 'temp-dev-token')
+    await authStore.login({
+      username: form.username,
+      password: form.password,
+    })
+    ElMessage.success('登录成功')
     router.push({ name: 'Workbench' })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : '登录失败，请稍后重试'
+    ElMessage.error(message)
   } finally {
     loading.value = false
   }

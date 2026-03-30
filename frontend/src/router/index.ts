@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -21,6 +22,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('@/pages/Settings.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
@@ -31,16 +38,17 @@ const router = createRouter({
   routes,
 })
 
-// Navigation guard placeholder — will be implemented with auth store
-router.beforeEach((to, _from, next) => {
-  const token = localStorage.getItem('readbud_token')
-  if (to.meta.requiresAuth && !token) {
-    next({ name: 'Login' })
-  } else if (to.name === 'Login' && token) {
-    next({ name: 'Workbench' })
-  } else {
-    next()
+// Navigation guard — redirect unauthenticated users to login
+router.beforeEach((to) => {
+  const authStore = useAuthStore()
+
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    return { name: 'Login', query: { redirect: to.fullPath } }
   }
+  if (to.name === 'Login' && authStore.isAuthenticated) {
+    return { name: 'Workbench' }
+  }
+  return true
 })
 
 export default router

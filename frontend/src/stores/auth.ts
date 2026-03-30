@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { login as loginApi } from '@/api/auth'
+import type { LoginRequest } from '@/types/api'
 
 export interface UserInfo {
   id: string
@@ -8,25 +10,53 @@ export interface UserInfo {
   role: string
 }
 
+const TOKEN_KEY = 'readbud_token'
+const USER_KEY = 'readbud_user'
+
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem('readbud_token'))
-  const user = ref<UserInfo | null>(null)
+  const token = ref<string | null>(localStorage.getItem(TOKEN_KEY))
+  const user = ref<UserInfo | null>(restoreUser())
 
   const isAuthenticated = computed(() => !!token.value)
 
+  function restoreUser(): UserInfo | null {
+    try {
+      const raw = localStorage.getItem(USER_KEY)
+      return raw ? (JSON.parse(raw) as UserInfo) : null
+    } catch {
+      return null
+    }
+  }
+
   function setToken(newToken: string) {
     token.value = newToken
-    localStorage.setItem('readbud_token', newToken)
+    localStorage.setItem(TOKEN_KEY, newToken)
+  }
+
+  function setUser(userInfo: UserInfo) {
+    user.value = userInfo
+    localStorage.setItem(USER_KEY, JSON.stringify(userInfo))
   }
 
   function clearAuth() {
     token.value = null
     user.value = null
-    localStorage.removeItem('readbud_token')
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
   }
 
-  function setUser(userInfo: UserInfo) {
-    user.value = userInfo
+  async function login(req: LoginRequest): Promise<void> {
+    const resp = await loginApi(req)
+    if (resp.code === 0 && resp.data) {
+      setToken(resp.data.token)
+      setUser(resp.data.user)
+    } else {
+      throw new Error(resp.message || '登录失败')
+    }
+  }
+
+  function logout() {
+    clearAuth()
   }
 
   return {
@@ -34,7 +64,9 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     isAuthenticated,
     setToken,
-    clearAuth,
     setUser,
+    clearAuth,
+    login,
+    logout,
   }
 })

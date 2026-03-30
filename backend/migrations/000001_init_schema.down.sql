@@ -1,0 +1,19 @@
+-- Reverse migration: drop all tables in dependency order
+DROP TABLE IF EXISTS topic_library CASCADE;
+DROP TABLE IF EXISTS distribution_packages CASCADE;
+DROP TABLE IF EXISTS review_rules CASCADE;
+DROP TABLE IF EXISTS content_citations CASCADE;
+DROP TABLE IF EXISTS draft_versions CASCADE;
+DROP TABLE IF EXISTS style_profiles CASCADE;
+DROP TABLE IF EXISTS brand_profiles CASCADE;
+DROP TABLE IF EXISTS metrics_snapshots CASCADE;
+DROP TABLE IF EXISTS publish_records CASCADE;
+DROP TABLE IF EXISTS publish_jobs CASCADE;
+DROP TABLE IF EXISTS assets CASCADE;
+DROP TABLE IF EXISTS article_blocks CASCADE;
+DROP TABLE IF EXISTS article_drafts CASCADE;
+DROP TABLE IF EXISTS source_documents CASCADE;
+DROP TABLE IF EXISTS content_tasks CASCADE;
+DROP TABLE IF EXISTS wechat_accounts CASCADE;
+DROP TABLE IF EXISTS provider_configs CASCADE;
+DROP TABLE IF EXISTS users CASCADE;

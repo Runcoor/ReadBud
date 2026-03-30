@@ -7,6 +7,8 @@
         <span class="header-desc">内容工作台</span>
       </div>
       <div class="header-actions">
+        <el-button text @click="router.push({ name: 'Settings' })">设置</el-button>
+        <span v-if="authStore.user" class="header-user">{{ authStore.user.nickname }}</span>
         <el-button text @click="handleLogout">退出</el-button>
       </div>
     </header>
@@ -47,12 +49,24 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { ElMessageBox } from 'element-plus'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
-function handleLogout() {
-  localStorage.removeItem('readbud_token')
-  router.push({ name: 'Login' })
+async function handleLogout() {
+  try {
+    await ElMessageBox.confirm('确定退出登录？', '退出', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'info',
+    })
+    authStore.logout()
+    router.push({ name: 'Login' })
+  } catch {
+    // User cancelled
+  }
 }
 </script>
 
@@ -94,6 +108,12 @@ function handleLogout() {
 .header-desc {
   font-size: $font-size-base;
   color: $color-text-secondary;
+}
+
+.header-user {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  margin-right: $spacing-sm;
 }
 
 .workbench-main {
