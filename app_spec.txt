@@ -1,0 +1,1080 @@
+================================================================================
+  阅芽 ReadBud — 产品规格说明书 (Application Specification)
+  让写作从一个词开始生长。
+================================================================================
+
+目录
+----
+1.  产品定义
+2.  平台边界约束
+3.  MVP 产品结构
+4.  完整业务流程设计
+5.  图片系统设计
+6.  图表系统设计
+7.  系统架构
+8.  后端技术方案 (Go)
+9.  前端技术方案 (Vue3 + TS)
+10. 内部 API 设计
+11. 数据库表设计 (PostgreSQL)
+12. 项目目录结构
+13. 推广和运营解决方案
+14. 产品亮点
+15. UI 风格规范
+16. 工程规范
+17. 端口配置
+
+================================================================================
+1. 产品定义
+================================================================================
+
+应用名称：阅芽 | ReadBud
+口号：让写作从一个词开始生长。
+
+目标人群：
+- 个人 IP / 自媒体运营者
+- 中小企业市场部
+- 知识付费、培训、咨询公司
+- ToB SaaS 内容团队
+- 需要稳定产出公众号内容的私域团队
+
+第一版只做一个核心功能：
+用户输入一个关键词，系统自动完成：
+1. 抓取公开可访问的爆款内容并做结构化分析
+2. 生成原创公众号文章
+3. 自动匹配图片与图表
+4. 生成公众号可发布版本
+5. 配置后自动发布到公众号
+6. 发布后自动同步数据做复盘
+
+================================================================================
+2. 平台边界约束
+================================================================================
+
+【公众号接口层】
+公众号开放服务在 2025 年 12 月 12 日之后进入新版 APIs 体系。
+调用前需要配置 IP 白名单。
+文档列出了 getAccessToken 和 getStableAccessToken 方法。
+新版网关模式还能为微信类接口自动拼接 access_token。
+
+==> 发布能力必须做成 Provider/Adapter，不能把 token、路径、素材上传、
+    发布轮询散落在业务代码里。
+
+【正文图片链路】
+草稿接口里，正文 content 支持 HTML，但正文内容要求少于 2 万字符且小于 1MB。
+正文中的外部图片链接会被过滤。
+封面图则需要永久素材的 thumb_media_id。
+
+==> 不能把网络图片 URL 直接塞进公众号正文，
+    必须先上传成公众号可用图片，再回填到文章 HTML 中。
+
+【正文图片与封面图片分两条线】
+- 正文内图片：上传图文消息内的图片获取 URL 接口，支持 jpg/png，要求 1MB 以下，
+  不占用公众号图片素材库配额。
+- 封面/永久素材：支持 image/voice/video/thumb，
+  缩略图要求 JPG 且 64KB 以下。
+
+【运营复盘不是后补功能】
+公众号接口已有：用户增减、累计用户、图文群发摘要、图文总数据、
+阅读、分时阅读、分享、分时分享、标签、订阅通知、客服消息等能力。
+==> 系统从第一天起就应该把"发文"与"增长"设计在一条链路里。
+
+================================================================================
+3. MVP 产品结构
+================================================================================
+
+产品原则：
+- 只做一个主页面：内容工作台
+- 不做复杂 CMS
+- 不做多租户 SaaS 复杂权限
+- 不上微服务
+- 不做花哨编辑器
+- 只做一条最强主流程
+
+页面结构（一个后台主页面就够）：
+- 左侧：任务输入区
+- 中间：任务执行流
+- 右侧：文章预览区 + 发布区
+
+【任务输入区字段】
+- 关键词
+- 目标读者
+- 文章风格
+- 目标字数
+- 是否自动配图
+- 是否自动生成图表
+- 发布账号
+- 发布时间
+- 是否自动发布
+
+【任务执行流节点】
+- 采集
+- 去重
+- 爆文分析
+- 文章提纲
+- 正文生成
+- 图片匹配
+- 图表生成
+- HTML 编译
+- 审核检查
+- 发布
+
+【文章预览区】
+- 标题
+- 摘要
+- 封面
+- 分段预览
+- 每段对应的图片/图表
+- 图片来源说明
+- 一键重新生成某一段
+- 一键替换某一张图
+- 立即发布 / 定时发布
+
+================================================================================
+4. 完整业务流程设计
+================================================================================
+
+----------------------------------------------------------------------
+4.1 关键词采集层
+----------------------------------------------------------------------
+
+输入一个关键词后，系统做 4 件事：
+
+A. 关键词扩展
+   - 原始关键词
+   - 同义词
+   - 场景词
+   - 疑问词
+   - 时间词
+   - 反向表达
+   例："私域运营" => "私域运营方法 / 私域成交 / 社群转化 / 私域留存 /
+                      私域 SOP / 私域案例"
+
+B. 来源搜索（通过多个 Source Adapter 搜公开可访问内容）
+   - 搜索引擎公开结果
+   - 行业媒体
+   - 新闻站点
+   - 公众号索引页
+   - 博客 / 社区 / 问答站点
+
+C. 页面抓取与正文提取
+   - URL 标准化
+   - 去重
+   - 标题抽取
+   - 正文抽取
+   - 时间抽取
+   - 作者抽取
+   - 图片提取
+   - 数据点提取
+
+D. 爆文评分（代理评分模型，不伪造阅读量）
+   hot_score = 标题吸引力 + 结构完整度 + 信息密度 + 场景痛点强度
+               + 数据证据强度 + 发布时间新鲜度 + 来源权重
+
+----------------------------------------------------------------------
+4.2 内容分析层
+----------------------------------------------------------------------
+
+每篇抓到的文章，统一转为结构化 JSON：
+{
+  "title": "",
+  "summary": "",
+  "core_viewpoints": [],
+  "pain_points": [],
+  "use_cases": [],
+  "data_points": [],
+  "quotes": [],
+  "content_outline": [],
+  "image_clues": [],
+  "cta_style": "",
+  "tone": "",
+  "source_url": ""
+}
+
+跨文档综合产出：
+- 共识观点
+- 冲突观点
+- 高频标题模式
+- 高频开头模式
+- 高频转化结构
+- 数据证据列表
+- 可视化候选点
+- 图片位建议
+
+重点不是"改写原文"，而是提炼观点后重写新稿。
+
+----------------------------------------------------------------------
+4.3 文章生成层（3 段式）
+----------------------------------------------------------------------
+
+第一段：生成选题 Brief
+  - 文章核心观点
+  - 目标读者画像
+  - 文章目标（阅读 / 转发 / 留资 / 关注）
+  - 标题候选 10 个
+  - 结构大纲
+  - 图片位规划
+  - 图表位规划
+  - CTA 设计
+
+第二段：生成 block 级文章
+  文章不要直接存成一整坨 HTML，生成为 block：
+  - title
+  - subtitle
+  - lead
+  - section
+  - image
+  - chart
+  - quote
+  - checklist
+  - summary
+  - cta
+
+第三段：编译公众号 HTML
+  - 全部内联样式
+  - 不依赖外部 CSS / JS
+  - 图片用公众号可访问 URL
+  - 图表渲染为图片插入
+  - 每张外部图片带来源说明
+  - 每个数据图表带"数据来源"
+
+================================================================================
+5. 图片系统设计
+================================================================================
+
+策略：Search First, Generate Fallback
+
+【优先路径：搜图】
+1. 根据段落语义生成图片检索词
+2. 调图库 / 搜图源
+3. 下载到本地
+4. 记录来源、作者、授权信息、落地页
+5. 做相关性评分
+6. 合格则入库
+
+【回退路径：生图】
+1. 没搜到 / 搜到的图不相关 / 视觉不统一
+2. 调用图片生成 API（如 OpenAI Image API）
+3. 支持 b64_json 图像内容，png/webp/jpeg 多种尺寸
+4. 落盘后再上传到公众号素材体系
+
+【图片位规划规则（按语义段落切）】
+- 封面图：1 张
+- 开头引导图：1 张
+- 每个 H2 段后 1 张图
+- 有数据的段落优先图表
+- 结尾 CTA 段可放引导图
+
+【图片数据结构】
+每张图要存：
+- 来源类型：search / generated / source_page
+- 原图 URL
+- 本地文件路径
+- 对应文章段落
+- 图片提示词
+- 来源站点
+- 来源作者
+- 授权信息
+- attribution 文案
+- 是否已上传公众号
+- 公众号图片 URL / media_id
+
+【图片展示规范】
+- 外部搜到的图片：图片下方显示「图片来源：xxx」
+- AI 生成图：显示「配图说明：AI 生成」
+- 抓取源文章里的图：显示「参考来源：原文配图」
+
+================================================================================
+6. 图表系统设计
+================================================================================
+
+【什么时候自动生成图表】
+- 出现 3 个以上同维度数值
+- 有时间序列
+- 有类别对比
+- 有排名
+- 有占比结构
+
+【图表类型规则】
+- 时间趋势：折线图
+- 类别对比：柱状图
+- 排名：横向条形图
+- 构成占比：环形图
+- 少量关键数字：数据卡片
+- 表格型证据：信息表格图
+
+【图表技术方案】
+- 前端预览：ECharts
+- 服务端出图：Node SSR ECharts 或 headless chromium 截图
+- 最终入公众号：统一导出 PNG
+
+【图表插入规则】
+- 每张图表必须附带标题
+- 必须附数据来源
+- 必须附单位
+- 必须附时间范围
+- 不能把不完整数据强行画图
+
+================================================================================
+7. 系统架构
+================================================================================
+
+模块化单体 + Worker 架构
+
+  Vue3 + TS 前端 (端口 19880)
+      |
+      v
+  Go API Server - Gin (端口 19881)
+      |---- PostgreSQL
+      |---- Redis
+      |---- Object Storage (MinIO / OSS / COS)
+      |
+      +---- Task Worker (Go + Asynq)
+              |---- Source Search Adapter
+              |---- Crawler Adapter
+              |---- LLM Adapter
+              |---- Image Search Adapter
+              |---- Image Generation Adapter
+              |---- Chart Renderer
+              |---- WeChat Publish Adapter
+              |---- Metrics Sync Adapter
+
+为什么不用微服务：
+- 只有一个功能
+- 业务上模块化
+- 部署上单体化
+- 耗时任务异步化
+- 比微服务更快落地、更稳、更容易维护
+
+================================================================================
+8. 后端技术方案 (Go)
+================================================================================
+
+【技术栈】
+- Web 框架：Gin
+- ORM：GORM
+- 数据库：PostgreSQL
+- 缓存 / 队列：Redis + Asynq
+- 对象存储：MinIO（开发）/ COS 或 OSS（生产）
+- 抓取：Colly + goquery
+- 动态页面兜底：chromedp
+- 配置：Viper
+- 日志：Zap
+- 定时任务：Asynq Scheduler 或 cron
+- 实时进度：SSE
+
+【后端模块】
+1. task      — 任务编排
+2. source    — 来源搜索与抓取
+3. analysis  — 爆文分析
+4. writer    — 文章生成
+5. asset     — 图片、图表、封面
+6. composer  — HTML 编译
+7. review    — 质量检查
+8. publish   — 公众号发布
+9. metrics   — 数据同步
+10. operation — 运营复盘
+
+【最重要的设计：外部能力全部抽象成 adapter】
+- SearchProvider
+- CrawlerProvider
+- LLMProvider
+- ImageSearchProvider
+- ImageGenProvider
+- ChartProvider
+- WeChatPublisher
+- StorageProvider
+
+这样后面换 API、换模型、换图库、换公众号接入方式，都不用动业务层。
+
+================================================================================
+9. 前端技术方案 (Vue3 + TS)
+================================================================================
+
+【技术栈】
+- Vue3
+- TypeScript
+- Vite
+- Pinia
+- Vue Router
+- Element Plus
+- Axios
+- ECharts
+- SSE 客户端
+- SCSS + Design Token
+
+【前端页面（只做 3 个页面）】
+1. 登录页
+2. 工作台页（主页面）
+3. 任务详情页
+
+【工作台逻辑】
+- 提交任务
+- 轮询/SSE 看进度
+- 实时展示来源文章
+- 实时展示提纲
+- 预览文章 blocks
+- 替换单个图片
+- 重新生成某一段
+- 发布 / 定时发布
+
+【为什么不要上富文本编辑器】
+第一版使用结构化 block 编辑器：
+- 每段是一个 block
+- block 可编辑
+- block 可重排
+- block 可替换图
+- block 可重新生成
+比富文本更稳，更适合 AI 生产内容。
+
+================================================================================
+10. 内部 API 设计
+================================================================================
+
+----------------------------------------------------------------------
+10.1 系统与配置
+----------------------------------------------------------------------
+POST   /api/v1/auth/login            登录
+GET    /api/v1/providers             获取 provider 配置
+POST   /api/v1/providers             保存 provider 配置
+GET    /api/v1/wechat/accounts       公众号账号列表
+POST   /api/v1/wechat/accounts       新增公众号配置
+
+----------------------------------------------------------------------
+10.2 任务
+----------------------------------------------------------------------
+POST   /api/v1/tasks                 创建内容任务
+GET    /api/v1/tasks/:id             获取任务详情
+GET    /api/v1/tasks/:id/events      SSE 获取任务进度
+POST   /api/v1/tasks/:id/retry       失败任务重试
+GET    /api/v1/tasks/:id/sources     来源文章列表
+
+----------------------------------------------------------------------
+10.3 文章
+----------------------------------------------------------------------
+GET    /api/v1/drafts/:id                            获取草稿详情
+PATCH  /api/v1/drafts/:id                            修改标题/摘要/封面等
+PATCH  /api/v1/drafts/:id/blocks/:blockId            修改单个 block
+POST   /api/v1/drafts/:id/blocks/:blockId/regenerate 重生某段
+POST   /api/v1/drafts/:id/rebuild-html               重新编译 HTML
+
+----------------------------------------------------------------------
+10.4 素材
+----------------------------------------------------------------------
+POST   /api/v1/assets/images/search      搜图
+POST   /api/v1/assets/images/generate    生图
+POST   /api/v1/assets/charts/render      出图表
+POST   /api/v1/assets/:id/upload-wechat  上传到公众号素材
+POST   /api/v1/drafts/:id/replace-image  替换图片
+
+----------------------------------------------------------------------
+10.5 发布
+----------------------------------------------------------------------
+POST   /api/v1/publish/jobs              创建发布任务
+GET    /api/v1/publish/jobs/:id          获取发布状态
+POST   /api/v1/publish/jobs/:id/cancel   取消定时发布
+POST   /api/v1/publish/jobs/:id/sync     手动同步发布状态
+
+----------------------------------------------------------------------
+10.6 复盘
+----------------------------------------------------------------------
+POST   /api/v1/metrics/sync              手动同步公众号数据
+GET    /api/v1/articles/:id/metrics      查看单篇数据
+GET    /api/v1/reports/overview           运营总览
+GET    /api/v1/reports/topics             选题复盘
+
+================================================================================
+11. 数据库表设计 (PostgreSQL)
+================================================================================
+
+所有表统一审计字段：
+- id bigserial pk
+- public_id varchar(26) unique  -- ULID 对外暴露
+- created_at timestamptz
+- updated_at timestamptz
+- deleted_at timestamptz null
+- created_by bigint null
+- updated_by bigint null
+
+PG 特有设计：
+- 开启 pg_trgm
+- 核心表主键用 bigserial
+- 对外暴露 ulid
+- metrics_snapshots 按月分区
+- 大量使用 jsonb 存半结构化数据
+- 对标题、关键词、来源 URL 做唯一性和去重索引
+- 所有时间统一 timestamptz
+- 不在 v1 里大量使用数据库 enum，改用 text + check
+- 所有迁移只增不改，不允许手改线上表
+
+----------------------------------------------------------------------
+11.1 users
+----------------------------------------------------------------------
+- username varchar(64)
+- password_hash varchar(255)
+- nickname varchar(64)
+- role varchar(32)
+- status smallint
+
+----------------------------------------------------------------------
+11.2 provider_configs
+----------------------------------------------------------------------
+- provider_type varchar(32)     -- llm / image_search / image_gen / search / storage
+- provider_name varchar(64)
+- config_json jsonb
+- secret_json_enc text
+- status smallint
+
+----------------------------------------------------------------------
+11.3 wechat_accounts
+----------------------------------------------------------------------
+- name varchar(64)
+- app_id varchar(64)
+- app_secret_enc text
+- token_mode varchar(32)        -- direct / stable / gateway_v2
+- stable_access_token text null
+- token_expire_at timestamptz null
+- gateway_user_api_id varchar(128) null
+- is_default smallint
+- status smallint
+- remark varchar(255)
+
+----------------------------------------------------------------------
+11.4 content_tasks
+----------------------------------------------------------------------
+- task_no varchar(64)
+- keyword varchar(255)
+- audience varchar(255)
+- tone varchar(64)
+- target_words int
+- image_mode varchar(32)        -- auto / search_only / generate_only
+- chart_mode smallint
+- publish_mode varchar(32)      -- manual / now / schedule
+- publish_at timestamptz null
+- wechat_account_id bigint
+- status varchar(32)            -- pending/collecting/analyzing/writing/asseting/
+                                --   review_ready/publishing/published/failed
+- progress int
+- current_stage varchar(64)
+- error_message text null
+- result_draft_id bigint null
+
+----------------------------------------------------------------------
+11.5 source_documents
+----------------------------------------------------------------------
+- task_id bigint
+- source_type varchar(32)       -- web/news/wechat/blog
+- site_name varchar(128)
+- source_url text
+- title varchar(512)
+- author varchar(128) null
+- published_at timestamptz null
+- crawled_at timestamptz
+- raw_html text
+- plain_text text
+- summary_json jsonb
+- hot_score decimal(10,2)
+- relevance_score decimal(10,2)
+- data_points_json jsonb
+- image_clues_json jsonb
+- license_note varchar(255) null
+
+----------------------------------------------------------------------
+11.6 article_drafts
+----------------------------------------------------------------------
+- task_id bigint
+- wechat_account_id bigint
+- title varchar(255)
+- subtitle varchar(255) null
+- digest varchar(512)
+- author_name varchar(64)
+- content_source_url text null
+- cover_asset_id bigint null
+- compiled_html text
+- outline_json jsonb
+- quality_score decimal(10,2)
+- similarity_score decimal(10,2)
+- risk_level varchar(32)
+- review_status varchar(32)     -- pending/pass/reject
+- version int
+
+----------------------------------------------------------------------
+11.7 article_blocks
+----------------------------------------------------------------------
+- draft_id bigint
+- sort_no int
+- block_type varchar(32)        -- lead/section/image/chart/quote/checklist/cta
+- heading varchar(255) null
+- text_md text null
+- html_fragment text null
+- asset_id bigint null
+- source_refs_json jsonb
+- prompt_text text null
+- status varchar(32)
+
+----------------------------------------------------------------------
+11.8 assets
+----------------------------------------------------------------------
+- asset_type varchar(32)        -- content_image/cover_image/chart/generated_image
+- source_kind varchar(32)       -- search/generated/source_page/uploaded
+- mime_type varchar(64)
+- storage_provider varchar(32)
+- bucket varchar(128)
+- object_key varchar(512)
+- local_path varchar(512) null
+- width int null
+- height int null
+- size_bytes bigint null
+- sha256 varchar(128)
+- source_url text null
+- source_page_url text null
+- source_site varchar(128) null
+- source_author varchar(128) null
+- license_type varchar(64) null
+- attribution_text varchar(255) null
+- prompt_text text null
+- is_ai_generated smallint
+- wechat_url text null
+- wechat_media_id varchar(128) null
+- wechat_upload_status varchar(32)
+
+----------------------------------------------------------------------
+11.9 publish_jobs
+----------------------------------------------------------------------
+- draft_id bigint
+- wechat_account_id bigint
+- publish_mode varchar(32)      -- now/schedule/manual
+- schedule_at timestamptz null
+- status varchar(32)            -- queued/submitting/polling/success/failed/cancelled
+- retry_count int
+- last_error text null
+- provider_request_json jsonb
+- provider_response_json jsonb
+
+----------------------------------------------------------------------
+11.10 publish_records
+----------------------------------------------------------------------
+- publish_job_id bigint
+- draft_id bigint
+- wechat_account_id bigint
+- draft_media_id varchar(128) null
+- publish_id varchar(128) null
+- article_id varchar(128) null
+- article_url text null
+- published_at timestamptz null
+- publish_status varchar(32)
+- extra_json jsonb
+
+----------------------------------------------------------------------
+11.11 metrics_snapshots（按月分区）
+----------------------------------------------------------------------
+- wechat_account_id bigint
+- article_id varchar(128)
+- metric_date date
+- read_count int null
+- read_user_count int null
+- share_count int null
+- share_user_count int null
+- add_fans_count int null
+- cancel_fans_count int null
+- net_fans_count int null
+- raw_json jsonb
+
+----------------------------------------------------------------------
+11.12 brand_profiles（品牌风格配置）
+----------------------------------------------------------------------
+- name varchar(64)
+- brand_tone text
+- forbidden_words jsonb
+- preferred_words jsonb
+- cta_rules jsonb
+- cover_style_rules jsonb
+- image_style_rules jsonb
+
+----------------------------------------------------------------------
+11.13 style_profiles（写作模板配置）
+----------------------------------------------------------------------
+- name varchar(64)
+- applicable_scene varchar(255)
+- opening_template text
+- structure_template jsonb
+- closing_template text
+- sentence_preference jsonb
+- title_preference jsonb
+
+----------------------------------------------------------------------
+11.14 draft_versions（草稿版本表）
+----------------------------------------------------------------------
+- draft_id bigint
+- version_no int
+- title varchar(255)
+- digest varchar(512)
+- blocks_json jsonb
+- html_snapshot text
+- operator_id bigint null
+- change_reason varchar(255)
+
+----------------------------------------------------------------------
+11.15 content_citations（内容引用表）
+----------------------------------------------------------------------
+- draft_id bigint
+- block_id bigint
+- source_document_id bigint
+- citation_type varchar(32)
+- citation_text text
+- source_link text
+- source_note varchar(255)
+
+----------------------------------------------------------------------
+11.16 review_rules（审核规则表）
+----------------------------------------------------------------------
+- rule_type varchar(32)
+- rule_content text
+- risk_level varchar(32)
+- is_enabled smallint
+
+----------------------------------------------------------------------
+11.17 distribution_packages（二次分发素材表）
+----------------------------------------------------------------------
+- draft_id bigint
+- community_copy text          -- 社群文案
+- moments_copy text            -- 朋友圈文案
+- summary_card text            -- 摘要卡片
+- comment_guide text           -- 评论区引导语
+- next_topic_suggestion text   -- 下篇选题建议
+
+----------------------------------------------------------------------
+11.18 topic_library（选题资产库）
+----------------------------------------------------------------------
+- keyword varchar(255)
+- audience varchar(255)
+- article_goal varchar(64)
+- historical_score decimal(10,2)
+- last_used_at timestamptz null
+- recommend_weight decimal(10,2)
+
+----------------------------------------------------------------------
+关键索引
+----------------------------------------------------------------------
+- content_tasks(task_no)
+- content_tasks(status, created_at)
+- source_documents(task_id, hot_score desc)
+- article_drafts(task_id, version desc)
+- article_blocks(draft_id, sort_no)
+- assets(sha256)
+- publish_jobs(status, schedule_at)
+- metrics_snapshots(article_id, metric_date)
+- topic_library(keyword) using gin(keyword gin_trgm_ops)
+
+================================================================================
+12. 项目目录结构
+================================================================================
+
+----------------------------------------------------------------------
+12.1 Go 后端
+----------------------------------------------------------------------
+backend/
+  cmd/
+    api/
+      main.go
+    worker/
+      main.go
+  internal/
+    api/
+      http/
+      middleware/
+      dto/
+    app/
+    domain/
+      task/
+      source/
+      draft/
+      asset/
+      publish/
+      metrics/
+    service/
+      task_service.go
+      source_service.go
+      analysis_service.go
+      writer_service.go
+      asset_service.go
+      publish_service.go
+      metrics_service.go
+    repository/
+      postgres/
+    integration/
+      search/
+      crawler/
+      llm/
+      image_search/
+      image_gen/
+      chart/
+      wechat/
+      storage/
+    worker/
+      jobs/
+    pkg/
+      logger/
+      crypto/
+      sse/
+      utils/
+  migrations/
+  configs/
+
+----------------------------------------------------------------------
+12.2 Vue3 前端
+----------------------------------------------------------------------
+frontend/
+  src/
+    api/
+    stores/
+    router/
+    pages/
+      Login.vue
+      Workbench.vue
+      TaskDetail.vue
+    components/
+      TaskForm.vue
+      TaskProgress.vue
+      SourceList.vue
+      DraftPreview.vue
+      BlockEditor.vue
+      PublishPanel.vue
+      MetricsPanel.vue
+    composables/
+    types/
+    styles/
+      _variables.scss
+      _reset.scss
+      _tokens.scss
+    utils/
+
+================================================================================
+13. 推广和运营解决方案
+================================================================================
+
+----------------------------------------------------------------------
+13.1 内容运营策略
+----------------------------------------------------------------------
+做 4 类内容池：
+- 热点跟进：追时效，拿曝光
+- 问题解决：拿搜索与收藏
+- 案例拆解：拿信任
+- 转化文章：拿咨询 / 留资 / 成交
+
+每篇文章明确一个目标：要阅读 / 要关注 / 要转发 / 要留资 / 要成交
+不能一篇文章什么都想要。
+
+----------------------------------------------------------------------
+13.2 标题运营
+----------------------------------------------------------------------
+系统内置标题工厂：
+- 数字型
+- 对比型
+- 反常识型
+- 清单型
+- 问题型
+- 场景型
+
+发布前给 10 个标题候选，并根据历史数据做排序。
+后面通过复盘把"高阅读标题模板库"积累下来。
+
+----------------------------------------------------------------------
+13.3 分发运营
+----------------------------------------------------------------------
+一篇内容生成后，系统顺手产出：
+- 公众号正文
+- 50 字摘要
+- 100 字社群文案
+- 朋友圈文案
+- 评论区引导语
+- 关键词自动回复建议
+
+----------------------------------------------------------------------
+13.4 用户运营（二期）
+----------------------------------------------------------------------
+利用公众号开放接口：
+- 新关注用户打标签
+- 根据阅读行为打标签
+- 针对标签推送内容
+- 文章发布后订阅提醒
+- 客服消息转化引导
+
+----------------------------------------------------------------------
+13.5 数据复盘
+----------------------------------------------------------------------
+5 个核心指标：阅读量 / 阅读人数 / 分享次数 / 分享人数 / 净增粉
+
+4 个分析维度：
+- 哪类标题更强
+- 哪类开头更强
+- 哪类图片更强
+- 哪类 CTA 更强
+
+最后反哺到下次生成的 prompt 里。
+
+================================================================================
+14. 产品亮点
+================================================================================
+
+亮点 1：证据驱动，而不是空想生成
+  不是凭空写，而是先分析公开高质量内容，再做结构化提炼和原创重组。
+
+亮点 2：段落级图文联动
+  每一段内容都能自动匹配图片或图表，不是最后随便塞图。
+
+亮点 3：生成可控，不是黑盒
+  用户可以精确替换一段、一张图、一个标题，而不是重来全文。
+
+亮点 4：发布即运营
+  发文不是终点，系统会继续产出分发素材、复盘数据和下次选题建议。
+
+亮点 5：品牌一致性
+  可以提前配置品牌语气、禁用词、偏好表达，让生成内容更像"这个品牌自己写的"。
+
+亮点 6：商业级审计能力
+  每次生成、修改、发布都有记录，方便团队协作和责任追踪。
+
+================================================================================
+15. UI 风格规范
+================================================================================
+
+整体风格关键词：大气 / 克制 / 专业 / 可信 / 有秩序 / 稳重 / 商务化
+
+【主色体系】
+- 主色：深海蓝 #1B3A5C
+- 辅色：石墨灰 #4A4A4A
+- 背景：云白 #F5F7FA
+- 强调色：低饱和蓝 #5B8DEF
+- 次强调：金属灰 #8C8C8C
+- 成功色：#52C41A
+- 警告色：#FAAD14
+- 错误色：#FF4D4F
+- 文本主色：#1F2937
+- 文本次色：#6B7280
+- 文本弱色：#9CA3AF
+- 分隔线：#E5E7EB
+- 卡片背景：#FFFFFF
+- 卡片阴影：0 1px 3px rgba(0,0,0,0.06)
+
+【不要做的东西】
+- 不要紫蓝渐变大光晕
+- 不要玻璃拟态
+- 不要机器人插画
+- 不要对话气泡式主界面
+- 不要"魔法""智能灵感""一键起飞"这种文案
+- 不要漂浮粒子、科幻动效、赛博配色
+
+【要做的东西】
+- 顶部横向主导航
+- 左侧窄导航 + 中央主工作区 + 右侧属性面板
+- 大留白
+- 统一卡片边距
+- 低饱和分隔线
+- 清晰层级
+- 标准化按钮和表单
+- 操作反馈明确
+
+【页面文案风格】
+避免：AI 创作 / 智能灵感 / 魔法生成 / 一键爆文
+替换为：选题分析 / 内容生成 / 配图处理 / 图表渲染 / 草稿预览 / 发布任务 / 复盘报告
+
+【首页布局】
+主界面做成一个内容工作台：
+- 左侧：任务表单（关键词/目标读者/文章目标/风格模板/字数/配图策略/发布时间）
+- 中间：任务过程（采集结果/爆文分析/提纲生成/正文分块/图文匹配/质量检查）
+- 右侧：文章结果（封面预览/标题/摘要/正文预览/图片来源/图表预览/发布按钮）
+
+================================================================================
+16. 工程规范
+================================================================================
+
+----------------------------------------------------------------------
+16.1 后端约束
+----------------------------------------------------------------------
+
+架构原则：
+- 模块化单体
+- SQL First
+- 业务逻辑进 Service
+- Handler 不写业务
+- Repository 不做业务判断
+- 外部能力全部 Adapter 化
+
+强制规则：
+1.  handler -> service -> repository / adapter 单向依赖
+2.  禁止跨层直接调用
+3.  禁止在 handler 里写 SQL
+4.  禁止在 repository 里拼装 HTTP 返回
+5.  禁止 giant util 包
+6.  禁止循环依赖
+7.  每个包只做一件事
+8.  事务只允许在 service 层开启
+9.  所有外部请求都必须带超时和重试策略
+10. 所有任务都必须可重放、可追踪、可中断
+
+代码风格限制：
+- Go 文件尽量不超过 400 行
+- 单函数尽量不超过 60 行
+- 嵌套层级不超过 3 层
+- 明确错误包装，不吞错
+- context.Context 必须作为第一个参数
+- 不写魔法字符串，统一常量或枚举类型
+- DTO、DO、VO 分离
+- 所有状态流转统一定义
+
+数据库约束：
+- 核心字段不用 jsonb 乱塞，jsonb 只放半结构化数据
+- 所有时间统一 timestamptz
+- 对外暴露 public_id，内部自增 id
+- 不在 v1 里大量使用数据库 enum，改用 text + check
+- 所有迁移只增不改，不允许手改线上表
+
+----------------------------------------------------------------------
+16.2 前端约束
+----------------------------------------------------------------------
+
+组件原则：
+- 页面组件只负责组装
+- 业务逻辑放 composables
+- 跨页面状态才进 Pinia
+- 表单和展示组件分离
+- 不允许在模板里写复杂逻辑
+
+类型约束：
+- 禁止 any
+- 所有接口类型统一从 API 契约生成
+- 所有状态枚举统一管理
+- 所有表单有独立 schema
+
+样式约束：
+- 不堆 utility class
+- 不用大段内联样式
+- 使用 SCSS + Design Token
+- 组件内部样式 scoped
+- 全局只放基础变量和 reset
+
+Vue 文件限制：
+- 单个页面文件尽量不超过 250 行
+- 单个 composable 尽量不超过 200 行
+- 单个组件职责单一
+- 展示组件尽量无副作用
+
+工程化：
+- eslint
+- prettier
+- stylelint
+- vue-tsc
+- 路由按页面分包
+- API 层统一封装
+- 错误提示统一
+
+================================================================================
+17. 端口配置
+================================================================================
+
+前端端口号：19880
+后端端口号：19881
+
+================================================================================
+  END OF SPECIFICATION
+================================================================================

@@ -1,0 +1,36 @@
+// ============================================================
+// Element Plus Theme Overrides
+// ============================================================
+@use './tokens' as *;
+
+// Override Element Plus CSS variables
+:root {
+  --el-color-primary: #{$color-primary};
+  --el-color-primary-light-3: #3d6186;
+  --el-color-primary-light-5: #8d9cae;
+  --el-color-primary-light-7: #b8c3d0;
+  --el-color-primary-light-8: #cdd5de;
+  --el-color-primary-light-9: #e3e8ee;
+  --el-color-primary-dark-2: #162e4a;
+
+  --el-color-success: #{$color-success};
+  --el-color-warning: #{$color-warning};
+  --el-color-danger: #{$color-error};
+  --el-color-info: #{$color-metal};
+
+  --el-bg-color: #{$color-bg};
+  --el-bg-color-page: #{$color-bg};
+  --el-fill-color-blank: #{$color-card-bg};
+
+  --el-text-color-primary: #{$color-text-primary};
+  --el-text-color-regular: #{$color-text-secondary};
+  --el-text-color-secondary: #{$color-text-muted};
+
+  --el-border-color: #{$color-border};
+  --el-border-color-light: #{$color-divider};
+
+  --el-font-family: #{$font-family};
+  --el-font-size-base: #{$font-size-base};
+
+  --el-border-radius-base: #{$radius-base};
+}
