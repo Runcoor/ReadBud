@@ -461,12 +461,134 @@ func (s *Server) handleChartGen(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	s.logger.Info("pipeline: chart gen", zap.Int64("task_id", p.TaskID))
+	s.logger.Info("pipeline: visual enhance (chart gen stage)", zap.Int64("task_id", p.TaskID))
 	if err := s.taskSvc.UpdateProgress(ctx, p.TaskID, taskDomain.StatusRunning, taskDomain.StageChartGen, 88); err != nil {
 		return err
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	task, err := s.taskSvc.GetByID(ctx, p.TaskID)
+	if err != nil || task == nil || task.ResultDraftID == nil {
+		return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
+	}
+
+	blocks, err := s.blockRepo.FindByDraftID(ctx, *task.ResultDraftID)
+	if err != nil || len(blocks) == 0 {
+		return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
+	}
+
+	// Build current article summary for LLM context
+	var articleSummary strings.Builder
+	for i, b := range blocks {
+		bType := b.BlockType
+		heading := derefStr(b.Heading)
+		text := derefStr(b.TextMD)
+		hasImg := b.HTMLFragment != nil && strings.Contains(*b.HTMLFragment, "<img")
+		articleSummary.WriteString(fmt.Sprintf("Block %d [%s]%s: %s\n", i, bType, func() string {
+			if heading != "" { return " heading=\"" + heading + "\"" }
+			return ""
+		}(), func() string {
+			if len(text) > 150 { return text[:150] + "..." }
+			return text
+		}()))
+		if hasImg {
+			articleSummary.WriteString("  (已有配图)\n")
+		}
+	}
+
+	// LLM visual enhancement round
+	enhancePrompt := `你是一位顶尖的微信公众号视觉设计师，专门为文章添加精美的HTML装饰元素，让排版媲美头部公众号。
+
+你的任务：分析下面的文章结构，为每个block生成富有设计感的HTML。所有样式必须使用inline style（微信公众号不支持class和外部CSS）。
+
+设计规范：
+1. **标题装饰**：每个section标题前加序号装饰，如彩色圆形序号、装饰线条、图标等。序号样式要有变化，不要全部一样。
+2. **内容增强**：在适当位置添加：
+   - 重点语句用彩色高亮框（不是全部加粗，而是选择性地用背景色+圆角框突出关键句子）
+   - 数据/对比信息用卡片或表格展示
+   - 并列观点用带图标的列表卡片
+   - 引用或名言用左边框引用样式
+3. **视觉节奏**：每2-3段之间插入一个视觉元素（分隔线、tips框、信息卡片、关键数据卡片等），避免大段纯文字
+4. **开头装饰**：lead block 开头添加一个品牌装饰元素（如渐变色分隔线、装饰图标等）
+5. **动态感**：适当使用 emoji 作为段落图标（但不要过多，每篇3-5个即可）
+6. **配色方案**：根据文章主题自动选择一个配色方案（如科技蓝#4F46E5、自然绿#059669、温暖橙#EA580C等），整篇文章保持配色统一
+7. **CTA 结尾**：如果已有CTA block，优化其HTML设计；如果没有，在最后添加一个精美的引导关注卡片
+
+禁止：
+- 不要改变文章的文字内容和含义
+- 不要删除已有的图片（<img>标签保留）
+- 不要使用CSS class，所有样式都用inline style
+- 不要使用JavaScript
+- 图片标签保留原样不要修改
+
+返回严格JSON格式（不要markdown代码块）：
+{
+  "color_scheme": "主色调hex值",
+  "blocks": [
+    {"index": 0, "html": "完整的HTML内容（包含原文+装饰）"},
+    {"index": 1, "html": "..."},
+    ...
+  ]
+}
+
+每个block的html字段应该是该block的完整HTML渲染结果，包含原始文字内容+你添加的所有装饰元素。`
+
+	enhanceContent, err := s.callLLM(ctx, enhancePrompt, articleSummary.String(), 8192)
+	if err != nil {
+		s.logger.Warn("visual enhance failed, continuing with original content", zap.Error(err))
+		return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
+	}
+
+	// Parse enhancement result
+	type enhanceBlock struct {
+		Index int    `json:"index"`
+		HTML  string `json:"html"`
+	}
+	type enhanceOutput struct {
+		ColorScheme string         `json:"color_scheme"`
+		Blocks      []enhanceBlock `json:"blocks"`
+	}
+
+	var enhanced enhanceOutput
+	cleaned := extractJSON(enhanceContent)
+	if err := json.Unmarshal([]byte(cleaned), &enhanced); err != nil {
+		s.logger.Warn("visual enhance: failed to parse LLM output", zap.Error(err))
+		return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
+	}
+
+	// Apply enhanced HTML to blocks
+	applied := 0
+	for _, eb := range enhanced.Blocks {
+		if eb.Index >= 0 && eb.Index < len(blocks) && eb.HTML != "" {
+			// Preserve existing images
+			existingHTML := ""
+			if blocks[eb.Index].HTMLFragment != nil {
+				existingHTML = *blocks[eb.Index].HTMLFragment
+			}
+
+			// If existing has images, merge them into the new HTML
+			newHTML := eb.HTML
+			if strings.Contains(existingHTML, "<figure") || strings.Contains(existingHTML, "<img") {
+				// Extract figure/img tags from existing and prepend
+				imgStart := strings.Index(existingHTML, "<figure")
+				if imgStart == -1 {
+					imgStart = strings.Index(existingHTML, "<img")
+				}
+				if imgStart >= 0 {
+					imgEnd := strings.Index(existingHTML[imgStart:], "</figure>")
+					if imgEnd >= 0 {
+						imgTag := existingHTML[imgStart : imgStart+imgEnd+len("</figure>")]
+						newHTML = imgTag + newHTML
+					}
+				}
+			}
+
+			blocks[eb.Index].HTMLFragment = &newHTML
+			s.blockRepo.Update(ctx, &blocks[eb.Index])
+			applied++
+		}
+	}
+
+	s.logger.Info("visual enhance: applied", zap.Int("blocks_enhanced", applied), zap.String("color_scheme", enhanced.ColorScheme))
 	return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
 }
 
@@ -571,6 +693,12 @@ func compileHTML(title string, blocks []draft.ArticleBlock) string {
 	sb.WriteString(fmt.Sprintf(`<h1 style="font-size:24px;font-weight:bold;margin-bottom:16px;">%s</h1>`, title))
 
 	for _, b := range blocks {
+		// If html_fragment exists (from visual enhance), use it directly
+		if b.HTMLFragment != nil && *b.HTMLFragment != "" {
+			sb.WriteString(*b.HTMLFragment)
+			continue
+		}
+
 		switch b.BlockType {
 		case draft.BlockTypeLead:
 			text := derefStr(b.TextMD)
