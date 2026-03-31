@@ -8,6 +8,7 @@ export function useMetrics(getArticleId: () => string | null) {
   // --- State ---
   const snapshots = ref<MetricsSnapshotVO[]>([])
   const loading = ref(false)
+  const fetchError = ref<string | null>(null)
   const dateRange = ref<string>('30d')
   const hasData = ref(false)
 
@@ -85,14 +86,15 @@ export function useMetrics(getArticleId: () => string | null) {
     if (!articleId) return
 
     loading.value = true
+    fetchError.value = null
     try {
       const resp = await getArticleMetrics(articleId, dateParams.value.start, dateParams.value.end)
       if (resp.code === 0) {
         snapshots.value = resp.data.snapshots ?? []
         hasData.value = snapshots.value.length > 0
       }
-    } catch {
-      // Handled by interceptor
+    } catch (e: unknown) {
+      fetchError.value = e instanceof Error ? e.message : '加载数据失败'
     } finally {
       loading.value = false
     }
@@ -142,6 +144,7 @@ export function useMetrics(getArticleId: () => string | null) {
     // State
     snapshots,
     loading,
+    fetchError,
     dateRange,
     hasData,
     // Computed

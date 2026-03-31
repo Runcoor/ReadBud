@@ -51,7 +51,12 @@
             </el-table-column>
           </el-table>
 
-          <el-empty v-if="!providerLoading && providers.length === 0" description="暂无服务配置" />
+          <el-empty v-if="!providerLoading && !providerError && providers.length === 0" description="暂无服务配置" />
+
+          <div v-if="providerError" class="tab-error">
+            <el-alert type="error" :title="providerError" :closable="false" show-icon />
+            <el-button size="small" type="primary" plain @click="loadProviders">重试</el-button>
+          </div>
         </el-tab-pane>
 
         <!-- WeChat Account Tab -->
@@ -90,7 +95,12 @@
             </el-table-column>
           </el-table>
 
-          <el-empty v-if="!wechatLoading && wechatAccounts.length === 0" description="暂无公众号配置" />
+          <el-empty v-if="!wechatLoading && !wechatError && wechatAccounts.length === 0" description="暂无公众号配置" />
+
+          <div v-if="wechatError" class="tab-error">
+            <el-alert type="error" :title="wechatError" :closable="false" show-icon />
+            <el-button size="small" type="primary" plain @click="loadWechatAccounts">重试</el-button>
+          </div>
         </el-tab-pane>
       </el-tabs>
     </main>
@@ -194,6 +204,7 @@ const activeTab = ref('providers')
 const providers = ref<ProviderConfigVO[]>([])
 const providerLoading = ref(false)
 const providerSaving = ref(false)
+const providerError = ref<string | null>(null)
 const showProviderDialog = ref(false)
 const providerConfigStr = ref('')
 const providerForm = reactive({
@@ -206,6 +217,7 @@ const providerForm = reactive({
 const wechatAccounts = ref<WechatAccountVO[]>([])
 const wechatLoading = ref(false)
 const wechatSaving = ref(false)
+const wechatError = ref<string | null>(null)
 const showWechatDialog = ref(false)
 const wechatForm = reactive({
   name: '',
@@ -234,13 +246,14 @@ function getTokenModeLabel(mode: string): string {
 
 async function loadProviders() {
   providerLoading.value = true
+  providerError.value = null
   try {
     const resp = await listProviders()
     if (resp.code === 0) {
       providers.value = resp.data || []
     }
-  } catch {
-    // Error handled by interceptor
+  } catch (e: unknown) {
+    providerError.value = e instanceof Error ? e.message : '加载服务配置失败'
   } finally {
     providerLoading.value = false
   }
@@ -248,13 +261,14 @@ async function loadProviders() {
 
 async function loadWechatAccounts() {
   wechatLoading.value = true
+  wechatError.value = null
   try {
     const resp = await listWechatAccounts()
     if (resp.code === 0) {
       wechatAccounts.value = resp.data || []
     }
-  } catch {
-    // Error handled by interceptor
+  } catch (e: unknown) {
+    wechatError.value = e instanceof Error ? e.message : '加载公众号配置失败'
   } finally {
     wechatLoading.value = false
   }
@@ -400,6 +414,14 @@ onMounted(() => {
 
 .settings-table {
   width: 100%;
+}
+
+.tab-error {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+  margin-top: $spacing-lg;
+  align-items: flex-start;
 }
 
 @media (max-width: $breakpoint-sm) {

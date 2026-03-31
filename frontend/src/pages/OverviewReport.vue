@@ -25,6 +25,15 @@
       </div>
     </div>
 
+    <!-- Error State -->
+    <div v-else-if="report.fetchError.value" class="report-error">
+      <el-result icon="warning" title="数据加载失败" :sub-title="report.fetchError.value">
+        <template #extra>
+          <el-button type="primary" @click="report.loadAll('default')">重新加载</el-button>
+        </template>
+      </el-result>
+    </div>
+
     <!-- Main Content -->
     <template v-else>
       <!-- KPI Cards -->
@@ -206,6 +215,13 @@ function formatDateShort(dateStr: string): string {
   font-size: $font-size-sm;
   color: $color-text-muted;
   margin: $spacing-xs 0 0;
+}
+
+// --- Error ---
+.report-error {
+  display: flex;
+  justify-content: center;
+  padding: $spacing-4xl 0;
 }
 
 // --- Loading ---

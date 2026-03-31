@@ -52,6 +52,8 @@
             <DraftPreview :draft-id="taskStore.currentTask.result_draft_id" />
             <div class="publish-divider" />
             <PublishPanel :draft="currentDraft" />
+            <div class="publish-divider" />
+            <DistributionPanel :draft-public-id="taskStore.currentTask.result_draft_id" />
           </div>
           <div v-else-if="taskStore.isRunning" class="right-placeholder">
             <el-skeleton :rows="6" animated />
@@ -81,6 +83,7 @@ import TaskForm from '@/components/task/TaskForm.vue'
 import TaskProgress from '@/components/task/TaskProgress.vue'
 import DraftPreview from '@/components/task/DraftPreview.vue'
 import PublishPanel from '@/components/task/PublishPanel.vue'
+import DistributionPanel from '@/components/task/DistributionPanel.vue'
 import { getDraft } from '@/api/draft'
 import type { CreateTaskRequest } from '@/types/task'
 import type { DraftVO } from '@/types/draft'

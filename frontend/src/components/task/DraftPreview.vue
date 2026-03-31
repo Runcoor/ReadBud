@@ -6,6 +6,13 @@
     <div v-else-if="loading" class="loading-state">
       <el-skeleton :rows="8" animated />
     </div>
+    <div v-else-if="fetchError" class="error-state">
+      <el-result icon="warning" title="加载失败" :sub-title="fetchError">
+        <template #extra>
+          <el-button size="small" type="primary" @click="retryFetch">重试</el-button>
+        </template>
+      </el-result>
+    </div>
     <div v-else-if="draft" class="phone-frame">
       <div class="phone-notch" />
       <div class="phone-screen">
@@ -87,6 +94,7 @@ const props = defineProps<Props>()
 
 const draft = ref<DraftVO | null>(null)
 const loading = ref(false)
+const fetchError = ref<string | null>(null)
 
 const sortedBlocks = computed<BlockVO[]>(() => {
   if (!draft.value) return []
@@ -100,11 +108,22 @@ function formatDate(dateStr: string): string {
 
 async function fetchDraft(id: string): Promise<void> {
   loading.value = true
+  fetchError.value = null
   try {
     const res = await getDraft(id)
     draft.value = res.data
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '加载文章预览失败'
+    fetchError.value = msg
+    draft.value = null
   } finally {
     loading.value = false
+  }
+}
+
+function retryFetch(): void {
+  if (props.draftId) {
+    fetchDraft(props.draftId)
   }
 }
 
@@ -129,7 +148,8 @@ watch(
 }
 
 .empty-state,
-.loading-state {
+.loading-state,
+.error-state {
   width: 100%;
   max-width: 375px;
   margin: 0 auto;

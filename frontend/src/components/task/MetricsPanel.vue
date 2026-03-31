@@ -19,6 +19,15 @@
       <el-skeleton :rows="4" animated />
     </div>
 
+    <!-- Error State -->
+    <div v-else-if="fetchError" class="panel-error">
+      <el-result icon="warning" title="数据加载失败" :sub-title="fetchError">
+        <template #extra>
+          <el-button size="small" type="primary" @click="fetchMetrics">重试</el-button>
+        </template>
+      </el-result>
+    </div>
+
     <!-- Empty State -->
     <div v-else-if="!hasData" class="panel-empty">
       <el-empty description="暂无数据" :image-size="64">
@@ -105,6 +114,7 @@ const props = defineProps<Props>()
 const {
   snapshots,
   loading,
+  fetchError,
   dateRange,
   hasData,
   dateRangeOptions,
@@ -287,6 +297,10 @@ watch(() => props.articleId, () => {
 
 // --- Loading / Empty ---
 .panel-loading {
+  padding: $spacing-xl 0;
+}
+
+.panel-error {
   padding: $spacing-xl 0;
 }
 

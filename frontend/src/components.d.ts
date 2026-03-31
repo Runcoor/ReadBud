@@ -12,32 +12,8 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     BlockEditor: typeof import('./components/task/BlockEditor.vue')['default']
+    DistributionPanel: typeof import('./components/task/DistributionPanel.vue')['default']
     DraftPreview: typeof import('./components/task/DraftPreview.vue')['default']
-    ElAlert: typeof import('element-plus/es')['ElAlert']
-    ElButton: typeof import('element-plus/es')['ElButton']
-    ElCard: typeof import('element-plus/es')['ElCard']
-    ElDatePicker: typeof import('element-plus/es')['ElDatePicker']
-    ElDialog: typeof import('element-plus/es')['ElDialog']
-    ElDivider: typeof import('element-plus/es')['ElDivider']
-    ElEmpty: typeof import('element-plus/es')['ElEmpty']
-    ElForm: typeof import('element-plus/es')['ElForm']
-    ElFormItem: typeof import('element-plus/es')['ElFormItem']
-    ElIcon: typeof import('element-plus/es')['ElIcon']
-    ElInput: typeof import('element-plus/es')['ElInput']
-    ElOption: typeof import('element-plus/es')['ElOption']
-    ElPageHeader: typeof import('element-plus/es')['ElPageHeader']
-    ElProgress: typeof import('element-plus/es')['ElProgress']
-    ElRadioButton: typeof import('element-plus/es')['ElRadioButton']
-    ElRadioGroup: typeof import('element-plus/es')['ElRadioGroup']
-    ElSelect: typeof import('element-plus/es')['ElSelect']
-    ElSkeleton: typeof import('element-plus/es')['ElSkeleton']
-    ElSlider: typeof import('element-plus/es')['ElSlider']
-    ElSwitch: typeof import('element-plus/es')['ElSwitch']
-    ElTable: typeof import('element-plus/es')['ElTable']
-    ElTableColumn: typeof import('element-plus/es')['ElTableColumn']
-    ElTabPane: typeof import('element-plus/es')['ElTabPane']
-    ElTabs: typeof import('element-plus/es')['ElTabs']
-    ElTag: typeof import('element-plus/es')['ElTag']
     MetricsPanel: typeof import('./components/task/MetricsPanel.vue')['default']
     PublishPanel: typeof import('./components/task/PublishPanel.vue')['default']
     PublishStatusCard: typeof import('./components/task/PublishStatusCard.vue')['default']
@@ -47,8 +23,5 @@ declare module 'vue' {
     TaskForm: typeof import('./components/task/TaskForm.vue')['default']
     TaskProgress: typeof import('./components/task/TaskProgress.vue')['default']
     TitleSelector: typeof import('./components/task/TitleSelector.vue')['default']
-  }
-  export interface GlobalDirectives {
-    vLoading: typeof import('element-plus/es')['ElLoadingDirective']
   }
 }

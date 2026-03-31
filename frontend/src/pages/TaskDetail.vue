@@ -135,6 +135,11 @@
           </div>
         </section>
       </div>
+
+      <!-- Distribution Package -->
+      <section v-if="task.result_draft_id" class="distribution-section">
+        <DistributionPanel :draft-public-id="task.result_draft_id" />
+      </section>
     </main>
 
     <main v-else class="detail-main">
@@ -150,6 +155,7 @@ import { ElMessage } from 'element-plus'
 import { getTask, retryTask } from '@/api/task'
 import { getTaskSources } from '@/api/draft'
 import DraftPreview from '@/components/task/DraftPreview.vue'
+import DistributionPanel from '@/components/task/DistributionPanel.vue'
 import type { TaskVO } from '@/types/task'
 import type { SourceVO } from '@/types/draft'
 import { IMAGE_MODE_LABELS, PUBLISH_MODE_LABELS, STATUS_LABELS, STATUS_TAG_TYPES } from '@/types/task'
@@ -478,6 +484,14 @@ onMounted(async () => {
   width: 28px;
   text-align: right;
   flex-shrink: 0;
+}
+
+// Distribution section
+.distribution-section {
+  background: $color-card-bg;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  padding: $spacing-xl;
 }
 
 @media (max-width: $breakpoint-md) {

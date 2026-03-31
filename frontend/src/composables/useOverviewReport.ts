@@ -17,6 +17,7 @@ export interface AnalysisDimension {
 export function useOverviewReport() {
   // --- State ---
   const loading = ref(false)
+  const fetchError = ref<string | null>(null)
   const overview = ref<MetricsOverviewVO | null>(null)
   const topics = ref<TopicVO[]>([])
   const recommendations = ref<TopicVO[]>([])
@@ -158,7 +159,12 @@ export function useOverviewReport() {
     if (accountId) {
       wechatAccountId.value = accountId
     }
-    await Promise.all([fetchOverview(), fetchTopics()])
+    fetchError.value = null
+    try {
+      await Promise.all([fetchOverview(), fetchTopics()])
+    } catch (e: unknown) {
+      fetchError.value = e instanceof Error ? e.message : '加载运营数据失败'
+    }
   }
 
   function exportReport(): void {
@@ -186,6 +192,7 @@ export function useOverviewReport() {
   return {
     // State
     loading,
+    fetchError,
     overview,
     topics,
     recommendations,
