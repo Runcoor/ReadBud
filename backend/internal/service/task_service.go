@@ -18,13 +18,14 @@ import (
 // TaskService handles content task business logic.
 type TaskService struct {
 	taskRepo    postgres.TaskRepository
+	draftRepo   postgres.ArticleDraftRepository
 	publisher   sse.EventPublisher
 	asynqClient *asynq.Client
 }
 
 // NewTaskService creates a new TaskService.
-func NewTaskService(taskRepo postgres.TaskRepository, publisher sse.EventPublisher, asynqClient *asynq.Client) *TaskService {
-	return &TaskService{taskRepo: taskRepo, publisher: publisher, asynqClient: asynqClient}
+func NewTaskService(taskRepo postgres.TaskRepository, draftRepo postgres.ArticleDraftRepository, publisher sse.EventPublisher, asynqClient *asynq.Client) *TaskService {
+	return &TaskService{taskRepo: taskRepo, draftRepo: draftRepo, publisher: publisher, asynqClient: asynqClient}
 }
 
 // Create creates a new content task and enqueues the pipeline.
@@ -65,7 +66,7 @@ func (s *TaskService) Create(ctx context.Context, req dto.CreateTaskRequest) (*d
 		}
 	}
 
-	vo := taskToVO(t)
+	vo := taskToVO(t, nil)
 	return &vo, nil
 }
 
@@ -78,7 +79,7 @@ func (s *TaskService) GetByPublicID(ctx context.Context, publicID string) (*dto.
 	if t == nil {
 		return nil, ErrNotFound
 	}
-	vo := taskToVO(*t)
+	vo := taskToVO(*t, s.resolveDraftPublicID(ctx, t.ResultDraftID))
 	return &vo, nil
 }
 
@@ -107,7 +108,7 @@ func (s *TaskService) ListRecent(ctx context.Context, page, pageSize int, status
 
 	items := make([]dto.TaskVO, 0, len(tasks))
 	for _, t := range tasks {
-		items = append(items, taskToVO(t))
+		items = append(items, taskToVO(t, s.resolveDraftPublicID(ctx, t.ResultDraftID)))
 	}
 
 	return &dto.TaskListResponse{
@@ -206,12 +207,17 @@ func (s *TaskService) MarkDone(ctx context.Context, taskID int64) error {
 		return fmt.Errorf("taskService.MarkDone: %w", err)
 	}
 
+	doneData := map[string]interface{}{
+		"status":   taskDomain.StatusDone,
+		"progress": 100,
+	}
+	// Include draft public ID so frontend can show preview immediately
+	if draftPubID := s.resolveDraftPublicID(ctx, t.ResultDraftID); draftPubID != nil {
+		doneData["result_draft_id"] = *draftPubID
+	}
 	s.publisher.Publish(t.PublicID, sse.Event{
 		Type: "done",
-		Data: map[string]interface{}{
-			"status":   taskDomain.StatusDone,
-			"progress": 100,
-		},
+		Data: doneData,
 	})
 	return nil
 }
@@ -247,7 +253,7 @@ func (s *TaskService) Retry(ctx context.Context, publicID string) (*dto.TaskVO, 
 		}
 	}
 
-	vo := taskToVO(*t)
+	vo := taskToVO(*t, nil)
 	return &vo, nil
 }
 
@@ -283,23 +289,35 @@ func (s *TaskService) GetByID(ctx context.Context, id int64) (*taskDomain.Conten
 	return s.taskRepo.FindByID(ctx, id)
 }
 
-func taskToVO(t taskDomain.ContentTask) dto.TaskVO {
+func (s *TaskService) resolveDraftPublicID(ctx context.Context, draftID *int64) *string {
+	if draftID == nil || s.draftRepo == nil {
+		return nil
+	}
+	d, err := s.draftRepo.FindByID(ctx, *draftID)
+	if err != nil || d == nil {
+		return nil
+	}
+	return &d.PublicID
+}
+
+func taskToVO(t taskDomain.ContentTask, draftPublicID *string) dto.TaskVO {
 	return dto.TaskVO{
-		ID:           t.PublicID,
-		TaskNo:       t.TaskNo,
-		Keyword:      t.Keyword,
-		Audience:     t.Audience,
-		Tone:         t.Tone,
-		TargetWords:  t.TargetWords,
-		ImageMode:    t.ImageMode,
-		ChartMode:    t.ChartMode,
-		PublishMode:  t.PublishMode,
-		PublishAt:    t.PublishAt,
-		Status:       t.Status,
-		Progress:     t.Progress,
-		CurrentStage: t.CurrentStage,
-		ErrorMessage: t.ErrorMessage,
-		CreatedAt:    t.CreatedAt,
-		UpdatedAt:    t.UpdatedAt,
+		ID:            t.PublicID,
+		TaskNo:        t.TaskNo,
+		Keyword:       t.Keyword,
+		Audience:      t.Audience,
+		Tone:          t.Tone,
+		TargetWords:   t.TargetWords,
+		ImageMode:     t.ImageMode,
+		ChartMode:     t.ChartMode,
+		PublishMode:   t.PublishMode,
+		PublishAt:     t.PublishAt,
+		Status:        t.Status,
+		Progress:      t.Progress,
+		CurrentStage:  t.CurrentStage,
+		ErrorMessage:  t.ErrorMessage,
+		ResultDraftID: draftPublicID,
+		CreatedAt:     t.CreatedAt,
+		UpdatedAt:     t.UpdatedAt,
 	}
 }

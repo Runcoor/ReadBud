@@ -72,7 +72,7 @@ func main() {
 	// Services
 	encSecret := viper.GetString("jwt.secret")
 	providerSvc := service.NewProviderConfigService(providerRepo, encSecret)
-	taskSvc := service.NewTaskService(taskRepo, ssePublisher, asynqClient)
+	taskSvc := service.NewTaskService(taskRepo, draftRepo, ssePublisher, asynqClient)
 
 	// LLM provider — dynamic from DB config with stub fallback
 	stubLLM := llm.NewStubLLMProvider(logger.L)
