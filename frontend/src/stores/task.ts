@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { createTask, getTask, listTasks, retryTask, createTaskSSE } from '@/api/task'
+import { createTask, getTask, listTasks, retryTask, cancelTask, createTaskSSE } from '@/api/task'
 import type { TaskVO, CreateTaskRequest, TaskStatus } from '@/types/task'
 
 export const useTaskStore = defineStore('task', () => {
@@ -65,6 +65,42 @@ export const useTaskStore = defineStore('task', () => {
     connectSSE(res.data.id)
   }
 
+  /** Cancel a pending or running task */
+  async function cancel(id: string): Promise<void> {
+    await cancelTask(id)
+    disconnectSSE()
+    currentTask.value = null
+  }
+
+  /** Auto-recovery: find an active or recent task on page load */
+  async function init(): Promise<void> {
+    try {
+      // 1. Check for a running task
+      const runningRes = await listTasks(1, 1, 'running')
+      if (runningRes.data.items.length > 0) {
+        currentTask.value = runningRes.data.items[0]
+        connectSSE(runningRes.data.items[0].id)
+        return
+      }
+
+      // 2. Check for a pending task
+      const pendingRes = await listTasks(1, 1, 'pending')
+      if (pendingRes.data.items.length > 0) {
+        currentTask.value = pendingRes.data.items[0]
+        connectSSE(pendingRes.data.items[0].id)
+        return
+      }
+
+      // 3. Show most recent task (no SSE)
+      const recentRes = await listTasks(1, 1)
+      if (recentRes.data.items.length > 0) {
+        currentTask.value = recentRes.data.items[0]
+      }
+    } catch {
+      // Silently catch errors during auto-recovery
+    }
+  }
+
   /** Connect to SSE for real-time progress updates */
   function connectSSE(taskId: string): void {
     disconnectSSE()
@@ -111,7 +147,11 @@ export const useTaskStore = defineStore('task', () => {
 
     es.onerror = () => {
       // EventSource will auto-reconnect, but we close on terminal states
-      if (currentTask.value?.status === 'done' || currentTask.value?.status === 'failed') {
+      if (
+        currentTask.value?.status === 'done' ||
+        currentTask.value?.status === 'failed' ||
+        currentTask.value?.status === 'cancelled'
+      ) {
         disconnectSSE()
       }
     }
@@ -149,6 +189,8 @@ export const useTaskStore = defineStore('task', () => {
     fetchTask,
     fetchList,
     retry,
+    cancel,
+    init,
     connectSSE,
     disconnectSSE,
     resetCurrent,
