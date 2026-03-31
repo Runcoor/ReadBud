@@ -144,7 +144,7 @@ watch(
 .draft-preview {
   display: flex;
   justify-content: center;
-  padding: $spacing-lg;
+  padding: 20px;
 }
 
 .empty-state,
@@ -153,36 +153,61 @@ watch(
   width: 100%;
   max-width: 375px;
   margin: 0 auto;
-  padding: $spacing-3xl $spacing-base;
+  padding: 48px 16px;
 }
 
+:deep(.el-empty__description p) {
+  color: var(--text-secondary) !important;
+}
+
+:deep(.el-skeleton) {
+  --el-skeleton-color: var(--surface-tertiary);
+  --el-skeleton-to-color: var(--border-light);
+}
+
+:deep(.el-result__title) {
+  color: var(--text-primary) !important;
+}
+
+:deep(.el-result__subtitle) {
+  color: var(--text-secondary) !important;
+}
+
+:deep(.el-button--primary) {
+  background: var(--text-primary) !important;
+  border-color: var(--text-primary) !important;
+  color: var(--text-inverse) !important;
+  border-radius: 8px !important;
+}
+
+// Phone frame
 .phone-frame {
   position: relative;
   width: 375px;
   min-height: 600px;
-  background: $color-card-bg;
-  border: 2px solid $color-border;
-  border-radius: $radius-xl * 3;
-  box-shadow: $shadow-card-hover;
+  background: var(--surface-bg);
+  border: 1px solid var(--border-light);
+  border-radius: 40px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
 .phone-notch {
   width: 120px;
   height: 24px;
-  background: $color-border;
-  border-radius: 0 0 $radius-lg $radius-lg;
+  background: var(--surface-tertiary);
+  border-radius: 0 0 14px 14px;
   margin: 0 auto;
 }
 
 .phone-screen {
-  padding: $spacing-base;
+  padding: 16px;
   max-height: 80vh;
   overflow-y: auto;
 }
 
 .cover-image {
-  margin: 0 (-$spacing-base) $spacing-base;
+  margin: 0 (-16px) 16px;
 
   img {
     width: 100%;
@@ -191,72 +216,72 @@ watch(
 }
 
 .draft-title {
-  font-size: $font-size-xl;
-  font-weight: $font-weight-bold;
-  color: $color-text-primary;
-  line-height: $line-height-tight;
-  margin-bottom: $spacing-sm;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+  margin-bottom: 8px;
 }
 
 .draft-subtitle {
-  font-size: $font-size-base;
-  color: $color-text-secondary;
-  margin-bottom: $spacing-md;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
 }
 
 .draft-meta {
   display: flex;
   align-items: center;
-  gap: $spacing-md;
-  font-size: $font-size-xs;
-  color: $color-text-muted;
-  margin-bottom: $spacing-base;
-  padding-bottom: $spacing-sm;
-  border-bottom: 1px solid $color-divider;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--border-medium);
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .draft-digest {
-  font-size: $font-size-sm;
-  color: $color-text-secondary;
-  line-height: $line-height-relaxed;
-  padding: $spacing-md;
-  background: rgba($color-accent, 0.06);
-  border-left: 3px solid $color-accent;
-  border-radius: 0 $radius-sm $radius-sm 0;
-  margin-bottom: $spacing-lg;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding: 12px;
+  background: var(--surface-tertiary);
+  border-left: 3px solid var(--text-primary);
+  border-radius: 0 8px 8px 0;
+  margin-bottom: 20px;
 }
 
 .block {
-  margin-bottom: $spacing-base;
+  margin-bottom: 14px;
 }
 
 .block-title h1 {
-  font-size: $font-size-lg;
-  font-weight: $font-weight-bold;
-  color: $color-text-primary;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .block-lead .lead-box {
-  padding: $spacing-md;
-  background: rgba($color-accent, 0.08);
-  border-radius: $radius-base;
-  font-size: $font-size-base;
-  color: $color-primary;
-  line-height: $line-height-relaxed;
+  padding: 12px;
+  background: var(--surface-tertiary);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
 
 .block-section {
   h2 {
-    font-size: $font-size-md;
-    font-weight: $font-weight-semibold;
-    color: $color-text-primary;
-    margin-bottom: $spacing-sm;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
   }
 
   .section-body {
-    font-size: $font-size-base;
-    color: $color-text-primary;
-    line-height: $line-height-relaxed;
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.7;
   }
 }
 
@@ -265,14 +290,14 @@ watch(
 
   img {
     max-width: 100%;
-    border-radius: $radius-base;
+    border-radius: 8px;
   }
 
   .image-caption {
     display: block;
-    font-size: $font-size-xs;
-    color: $color-text-muted;
-    margin-top: $spacing-xs;
+    font-size: 12px;
+    color: var(--border-medium);
+    margin-top: 6px;
   }
 }
 
@@ -281,66 +306,65 @@ watch(
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: $spacing-sm;
-  padding: $spacing-2xl;
-  background: $color-bg;
-  border: 1px dashed $color-border;
-  border-radius: $radius-base;
-  color: $color-text-muted;
-  font-size: $font-size-sm;
+  gap: 10px;
+  padding: 32px;
+  background: var(--surface-secondary);
+  border: 1px dashed var(--border-light);
+  border-radius: 8px;
+  color: var(--border-medium);
+  font-size: 13px;
 }
 
 .block-quote blockquote {
   margin: 0;
-  padding: $spacing-md $spacing-base;
-  border-left: 3px solid $color-metal;
-  background: $color-bg;
-  border-radius: 0 $radius-sm $radius-sm 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--border-light);
+  background: var(--surface-secondary);
+  border-radius: 0 8px 8px 0;
 
   p {
-    font-size: $font-size-base;
-    color: $color-text-secondary;
-    line-height: $line-height-relaxed;
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
     font-style: italic;
     margin: 0;
   }
 
   footer {
-    font-size: $font-size-xs;
-    color: $color-text-muted;
-    margin-top: $spacing-sm;
+    font-size: 12px;
+    color: var(--border-medium);
+    margin-top: 8px;
   }
 }
 
 .block-cta .cta-card {
-  padding: $spacing-base;
-  background: linear-gradient(135deg, $color-primary, $color-accent);
-  border-radius: $radius-lg;
-  color: #fff;
+  padding: 16px;
+  background: var(--text-primary);
+  border-radius: 8px;
+  color: var(--text-inverse);
 
   h3 {
-    font-size: $font-size-md;
-    font-weight: $font-weight-semibold;
-    margin-bottom: $spacing-xs;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
   }
 
   p {
-    font-size: $font-size-sm;
-    opacity: 0.9;
+    font-size: 13px;
+    opacity: 0.8;
     margin: 0;
   }
 }
 
-// Responsive: When inside stacked layout, make phone frame fluid
-@media (max-width: $breakpoint-md) {
+@media (max-width: 1024px) {
   .draft-preview {
-    padding: $spacing-base;
+    padding: 14px;
   }
 
   .phone-frame {
     width: 100%;
     max-width: 375px;
-    border-radius: $radius-xl * 2;
+    border-radius: 32px;
   }
 
   .empty-state,
@@ -350,17 +374,15 @@ watch(
   }
 }
 
-// Responsive: Mobile — compact phone frame
-@media (max-width: $breakpoint-sm) {
+@media (max-width: 768px) {
   .draft-preview {
-    padding: $spacing-sm;
+    padding: 8px;
   }
 
   .phone-frame {
-    border-radius: $radius-lg;
+    border-radius: 20px;
     min-height: 400px;
     border-width: 1px;
-    box-shadow: $shadow-card;
   }
 
   .phone-notch {
@@ -369,12 +391,12 @@ watch(
   }
 
   .phone-screen {
-    padding: $spacing-sm;
+    padding: 12px;
     max-height: 60vh;
   }
 
   .draft-title {
-    font-size: $font-size-lg;
+    font-size: 17px;
   }
 }
 </style>

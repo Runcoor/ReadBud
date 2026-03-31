@@ -230,23 +230,23 @@ async function handleSubmit(): Promise<void> {
 <style lang="scss" scoped>
 .task-form {
   :deep(.el-form-item__label) {
-    font-weight: $font-weight-medium;
-    color: $color-text-primary;
-    padding-bottom: $spacing-xs;
+    font-weight: 500;
+    color: var(--text-secondary) !important;
+    padding-bottom: 4px;
   }
 }
 
 .form-section {
-  margin-bottom: $spacing-sm;
+  margin-bottom: 8px;
 }
 
 .form-section-title {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-semibold;
-  color: $color-text-secondary;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--border-medium);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: $spacing-base;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
 }
 
 .w-full {
@@ -254,47 +254,153 @@ async function handleSubmit(): Promise<void> {
 }
 
 .form-actions {
-  padding-top: $spacing-base;
+  padding-top: 14px;
 }
 
 .submit-btn {
   width: 100%;
   height: 44px;
-  font-size: $font-size-md;
-  font-weight: $font-weight-semibold;
-  background-color: $color-primary;
-  border-color: $color-primary;
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--text-primary) !important;
+  border-color: var(--text-primary) !important;
+  color: var(--text-inverse) !important;
+  border-radius: 8px !important;
+  transition: all 0.15s ease;
 
   &:hover:not(:disabled) {
-    background-color: lighten($color-primary, 8%);
-    border-color: lighten($color-primary, 8%);
+    background: var(--surface-inverse) !important;
+    border-color: var(--surface-inverse) !important;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
   }
 }
 
+// Input overrides
+:deep(.el-input__wrapper) {
+  background: var(--surface-bg) !important;
+  border: 1px solid var(--border-light) !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: var(--border-medium) !important;
+  }
+
+  &.is-focus {
+    border-color: var(--text-primary) !important;
+    box-shadow: 0 0 0 2px rgba(10, 10, 10, 0.1) !important;
+  }
+}
+
+:deep(.el-input__inner) {
+  color: var(--text-primary) !important;
+  &::placeholder {
+    color: var(--text-placeholder) !important;
+  }
+}
+
+:deep(.el-input__count-inner) {
+  background: transparent !important;
+  color: var(--border-medium) !important;
+}
+
+// Select
+:deep(.el-select__wrapper) {
+  background: var(--surface-bg) !important;
+  border: 1px solid var(--border-light) !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+}
+
+// Divider
 :deep(.el-divider) {
-  margin: $spacing-lg 0;
-  border-color: $color-divider;
+  margin: 18px 0;
+  border-color: var(--border-light);
+}
+
+// Radio button group
+:deep(.el-radio-group) {
+  flex-wrap: wrap;
 }
 
 :deep(.el-radio-button__inner) {
-  font-size: $font-size-sm;
+  font-size: 13px;
+  background: var(--surface-bg) !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-secondary) !important;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: var(--text-primary) !important;
+  }
 }
 
+:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: var(--text-primary) !important;
+  border-color: var(--text-primary) !important;
+  color: var(--text-inverse) !important;
+  box-shadow: -1px 0 0 0 var(--text-primary) !important;
+}
+
+// Slider
 :deep(.el-slider) {
-  padding: 0 $spacing-sm;
+  padding: 0 8px;
+
+  .el-slider__runway {
+    background-color: var(--border-light);
+  }
+
+  .el-slider__bar {
+    background: var(--text-primary);
+  }
+
+  .el-slider__button {
+    border-color: var(--text-primary);
+    background: var(--text-primary);
+  }
+
+  .el-slider__marks-text {
+    color: var(--border-medium);
+    font-size: 11px;
+  }
 }
 
-// Responsive: Mobile — wrap radio buttons, compact slider
-@media (max-width: $breakpoint-sm) {
+:deep(.el-slider__input) {
+  .el-input__wrapper {
+    background: var(--surface-bg) !important;
+    border: 1px solid var(--border-light) !important;
+    box-shadow: none !important;
+  }
+}
+
+// Switch
+:deep(.el-switch) {
+  --el-switch-off-color: var(--border-medium);
+  --el-switch-on-color: var(--text-primary);
+
+  .el-switch__label {
+    color: var(--text-secondary) !important;
+
+    &.is-active {
+      color: var(--text-primary) !important;
+    }
+  }
+}
+
+@media (max-width: 768px) {
   .form-section-title {
-    font-size: $font-size-xs;
-    margin-bottom: $spacing-sm;
+    font-size: 10px;
+    margin-bottom: 10px;
   }
 
   :deep(.el-radio-group) {
     display: flex;
     flex-wrap: wrap;
-    gap: $spacing-xs;
+    gap: 4px;
   }
 
   :deep(.el-radio-button) {
@@ -302,8 +408,8 @@ async function handleSubmit(): Promise<void> {
   }
 
   :deep(.el-radio-button__inner) {
-    padding: $spacing-xs $spacing-sm;
-    font-size: $font-size-xs;
+    padding: 4px 10px;
+    font-size: 12px;
   }
 
   :deep(.el-slider) {
@@ -316,11 +422,11 @@ async function handleSubmit(): Promise<void> {
 
   .submit-btn {
     height: 40px;
-    font-size: $font-size-base;
+    font-size: 14px;
   }
 
   :deep(.el-divider) {
-    margin: $spacing-base 0;
+    margin: 12px 0;
   }
 }
 </style>
