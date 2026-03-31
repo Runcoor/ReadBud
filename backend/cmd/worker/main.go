@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -11,8 +12,9 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/spf13/viper"
 
+	"readbud/internal/adapter"
 	"readbud/internal/integration"
-	imageStub "readbud/internal/integration/image"
+	imageInteg "readbud/internal/integration/image"
 	"readbud/internal/integration/llm"
 	"readbud/internal/pkg/database"
 	"readbud/internal/pkg/logger"
@@ -76,9 +78,30 @@ func main() {
 
 	// LLM provider — dynamic from DB config with stub fallback
 	stubLLM := llm.NewStubLLMProvider(logger.L)
-	_ = imageStub.NewStubImageGenProvider(logger.L)
 	providerFactory := integration.NewProviderFactory(providerSvc, logger.L)
 	lazyLLM := integration.NewLazyLLMProvider(providerFactory, stubLLM)
+
+	// Image search provider (Pexels) — resolve from DB config with stub fallback
+	var imageSearchProvider adapter.ImageSearchProvider
+	imgSearchSecret, err := providerSvc.GetDecryptedSecret(context.Background(), "image_search")
+	if err == nil && imgSearchSecret != "" {
+		apiKey := imgSearchSecret
+		var sec struct {
+			APIKey string `json:"api_key"`
+		}
+		if json.Unmarshal([]byte(imgSearchSecret), &sec) == nil && sec.APIKey != "" {
+			apiKey = sec.APIKey
+		}
+		imageSearchProvider = imageInteg.NewPexelsProvider(apiKey, logger.L)
+		logger.L.Info("image search provider: Pexels")
+	} else {
+		imageSearchProvider = imageInteg.NewStubImageSearchProvider(logger.L)
+		logger.L.Info("image search provider: stub (no config)")
+	}
+
+	// Image gen provider — lazy from DB config with stub fallback
+	stubImageGen := imageInteg.NewStubImageGenProvider(logger.L)
+	imageGenProvider := integration.NewLazyImageGenProvider(providerFactory, stubImageGen)
 
 	// Worker server
 	workerCfg := worker.ServerConfig{
@@ -88,7 +111,7 @@ func main() {
 		Concurrency:   5,
 	}
 
-	srv := worker.NewServer(workerCfg, taskSvc, draftRepo, blockRepo, sourceRepo, lazyLLM, logger.L)
+	srv := worker.NewServer(workerCfg, taskSvc, draftRepo, blockRepo, sourceRepo, lazyLLM, imageSearchProvider, imageGenProvider, logger.L)
 
 	// Start
 	if err := srv.Start(); err != nil {
