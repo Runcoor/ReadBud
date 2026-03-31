@@ -7,6 +7,7 @@
         <span class="header-desc">内容工作台</span>
       </div>
       <div class="header-actions">
+        <el-button text @click="router.push({ name: 'OverviewReport' })">运营总览</el-button>
         <el-button text @click="router.push({ name: 'Settings' })">设置</el-button>
         <span v-if="authStore.user" class="header-user">{{ authStore.user.nickname }}</span>
         <el-button text @click="handleLogout">退出</el-button>

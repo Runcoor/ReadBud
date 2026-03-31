@@ -54,4 +54,8 @@ export function patch<T>(url: string, data?: unknown, config?: AxiosRequestConfi
   return service.patch(url, data, config) as Promise<T>
 }
 
+export function del<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  return service.delete(url, config) as Promise<T>
+}
+
 export default service

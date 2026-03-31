@@ -28,6 +28,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/reports',
+    name: 'OverviewReport',
+    component: () => import('@/pages/OverviewReport.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },

@@ -114,6 +114,9 @@ func main() {
 		// Metrics repository
 		metricsRepo := postgres.NewMetricsSnapshotRepository(db)
 
+		// Topic library repository
+		topicLibraryRepo := postgres.NewTopicLibraryRepository(db)
+
 		// Stub adapters for development
 		stubPublisher := wechat.NewStubWeChatPublisher(logger.L)
 		stubTokenProv := wechat.NewStubTokenProvider()
@@ -129,6 +132,7 @@ func main() {
 		contentImageSvc := service.NewContentImageService(assetRepo, stubPublisher, stubStorage, stubTokenProv, logger.L)
 		publishSvc := service.NewPublishService(publishJobRepo, publishRecordRepo, stubPublisher, stubTokenProv, contentImageSvc, logger.L)
 		metricsSvc := service.NewMetricsService(metricsRepo, publishRecordRepo, stubMetricsSync, stubTokenProv, logger.L)
+		topicLibrarySvc := service.NewTopicLibraryService(topicLibraryRepo, taskRepo, metricsRepo, logger.L)
 
 		// Handlers
 		authHandler := apiHTTP.NewAuthHandler(authSvc)
@@ -139,6 +143,7 @@ func main() {
 		sourceHandler := apiHTTP.NewSourceHandler(draftSvc)
 		publishHandler := apiHTTP.NewPublishHandler(publishSvc, draftRepo, wechatRepo)
 		metricsHandler := apiHTTP.NewMetricsHandler(metricsSvc, wechatRepo)
+		topicHandler := apiHTTP.NewTopicHandler(topicLibrarySvc)
 
 		// Public routes (no auth required)
 		authHandler.RegisterRoutes(v1)
@@ -154,6 +159,7 @@ func main() {
 			draftHandler.RegisterRoutes(protected)
 			publishHandler.RegisterRoutes(protected)
 			metricsHandler.RegisterRoutes(protected)
+			topicHandler.RegisterRoutes(protected)
 			protected.GET("/tasks/:id/events", sseHub.ServeHTTP("id"))
 			protected.GET("/tasks/:id/sources", sourceHandler.GetTaskSources)
 		}
