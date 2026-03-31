@@ -18,13 +18,13 @@ import (
 // TaskService handles content task business logic.
 type TaskService struct {
 	taskRepo    postgres.TaskRepository
-	sseHub      *sse.Hub
+	publisher   sse.EventPublisher
 	asynqClient *asynq.Client
 }
 
 // NewTaskService creates a new TaskService.
-func NewTaskService(taskRepo postgres.TaskRepository, sseHub *sse.Hub, asynqClient *asynq.Client) *TaskService {
-	return &TaskService{taskRepo: taskRepo, sseHub: sseHub, asynqClient: asynqClient}
+func NewTaskService(taskRepo postgres.TaskRepository, publisher sse.EventPublisher, asynqClient *asynq.Client) *TaskService {
+	return &TaskService{taskRepo: taskRepo, publisher: publisher, asynqClient: asynqClient}
 }
 
 // Create creates a new content task and enqueues the pipeline.
@@ -137,7 +137,7 @@ func (s *TaskService) UpdateProgress(ctx context.Context, taskID int64, status s
 	}
 
 	// Publish SSE event for real-time progress
-	s.sseHub.Publish(t.PublicID, sse.Event{
+	s.publisher.Publish(t.PublicID, sse.Event{
 		Type: "progress",
 		Data: map[string]interface{}{
 			"status":   status,
@@ -179,7 +179,7 @@ func (s *TaskService) MarkFailed(ctx context.Context, taskID int64, errMsg strin
 	}
 
 	// Publish SSE event for failure
-	s.sseHub.Publish(t.PublicID, sse.Event{
+	s.publisher.Publish(t.PublicID, sse.Event{
 		Type: "failed",
 		Data: map[string]interface{}{
 			"status":  taskDomain.StatusFailed,
@@ -206,7 +206,7 @@ func (s *TaskService) MarkDone(ctx context.Context, taskID int64) error {
 		return fmt.Errorf("taskService.MarkDone: %w", err)
 	}
 
-	s.sseHub.Publish(t.PublicID, sse.Event{
+	s.publisher.Publish(t.PublicID, sse.Event{
 		Type: "done",
 		Data: map[string]interface{}{
 			"status":   taskDomain.StatusDone,
@@ -269,7 +269,7 @@ func (s *TaskService) CancelTask(ctx context.Context, publicID string) error {
 		return fmt.Errorf("taskService.CancelTask: %w", err)
 	}
 
-	s.sseHub.Publish(t.PublicID, sse.Event{
+	s.publisher.Publish(t.PublicID, sse.Event{
 		Type: "cancelled",
 		Data: map[string]interface{}{
 			"status": taskDomain.StatusCancelled,

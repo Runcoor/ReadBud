@@ -9,6 +9,8 @@ import (
 	"readbud/internal/api"
 	apiHTTP "readbud/internal/api/http"
 	"readbud/internal/api/middleware"
+	"readbud/internal/integration"
+	imageStub "readbud/internal/integration/image"
 	"readbud/internal/integration/llm"
 	"readbud/internal/integration/storage"
 	"readbud/internal/integration/wechat"
@@ -20,6 +22,7 @@ import (
 	"readbud/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 	"github.com/spf13/viper"
 )
 
@@ -58,13 +61,11 @@ func main() {
 			_ = database.Close(db)
 		}()
 
-		// Run auto-migration in development mode
-		if viper.GetString("server.mode") == "debug" {
-			if migrateErr := database.AutoMigrate(db); migrateErr != nil {
-				log.Printf("WARNING: Auto-migration failed: %v", migrateErr)
-			} else {
-				log.Println("Database auto-migration completed successfully")
-			}
+		// Run auto-migration
+		if migrateErr := database.AutoMigrate(db); migrateErr != nil {
+			log.Printf("WARNING: Auto-migration failed: %v", migrateErr)
+		} else {
+			log.Println("Database auto-migration completed successfully")
 		}
 	}
 
@@ -103,6 +104,13 @@ func main() {
 	// SSE hub for real-time task progress
 	sseHub := sse.NewHub()
 
+	// Redis subscriber: forwards worker SSE events to the local Hub
+	redisAddr := viper.GetString("redis.addr")
+	redisPassword := viper.GetString("redis.password")
+	redisDB := viper.GetInt("redis.db")
+	sseRedis := sse.NewRedisClient(redisAddr, redisPassword, redisDB)
+	go sse.StartRedisSubscriber(context.Background(), sseRedis, sseHub)
+
 	// Wire up services and handlers
 	if db != nil {
 		// Repositories
@@ -139,24 +147,38 @@ func main() {
 		brandRepo := postgres.NewBrandProfileRepository(db)
 		styleRepo := postgres.NewStyleProfileRepository(db)
 
-		// Stub adapters for development
+		// Stub adapters for development (used as fallbacks)
 		stubPublisher := wechat.NewStubWeChatPublisher(logger.L)
 		stubTokenProv := wechat.NewStubTokenProvider()
 		stubStorage := storage.NewStubStorageProvider(logger.L)
 		stubMetricsSync := wechat.NewStubMetricsSyncProvider(logger.L)
 		stubLLM := llm.NewStubLLMProvider(logger.L)
+		stubImageGen := imageStub.NewStubImageGenProvider(logger.L)
+
+		// Asynq client for task queue
+		asynqClient := asynq.NewClient(asynq.RedisClientOpt{
+			Addr:     viper.GetString("redis.addr"),
+			Password: viper.GetString("redis.password"),
+			DB:       viper.GetInt("redis.db"),
+		})
 
 		// Services
 		authSvc := service.NewAuthService(userRepo, jwtCfg)
 		providerSvc := service.NewProviderConfigService(providerRepo, encSecret)
+
+		// Dynamic provider factory — resolves real providers from DB config
+		providerFactory := integration.NewProviderFactory(providerSvc, logger.L)
+		lazyLLM := integration.NewLazyLLMProvider(providerFactory, stubLLM)
+		lazyImageGen := integration.NewLazyImageGenProvider(providerFactory, stubImageGen)
+		_ = lazyImageGen // available for future injection
 		wechatSvc := service.NewWechatAccountService(wechatRepo, encSecret)
-		taskSvc := service.NewTaskService(taskRepo, sseHub)
+		taskSvc := service.NewTaskService(taskRepo, sseHub, asynqClient)
 		draftSvc := service.NewDraftService(draftRepo, blockRepo, sourceRepo, taskRepo)
 		contentImageSvc := service.NewContentImageService(assetRepo, stubPublisher, stubStorage, stubTokenProv, logger.L)
 		publishSvc := service.NewPublishService(publishJobRepo, publishRecordRepo, stubPublisher, stubTokenProv, contentImageSvc, logger.L)
 		metricsSvc := service.NewMetricsService(metricsRepo, publishRecordRepo, stubMetricsSync, stubTokenProv, logger.L)
 		topicLibrarySvc := service.NewTopicLibraryService(topicLibraryRepo, taskRepo, metricsRepo, logger.L)
-		distributionSvc := service.NewDistributionService(distributionRepo, draftRepo, blockRepo, stubLLM, logger.L)
+		distributionSvc := service.NewDistributionService(distributionRepo, draftRepo, blockRepo, lazyLLM, logger.L)
 		draftVersionSvc := service.NewDraftVersionService(draftVersionRepo, draftRepo, blockRepo, citationRepo)
 		citationSvc := service.NewCitationService(citationRepo, draftRepo, blockRepo, sourceRepo)
 		reviewRuleSvc := service.NewReviewRuleService(reviewRuleRepo)
@@ -165,7 +187,7 @@ func main() {
 
 		// Handlers
 		authHandler := apiHTTP.NewAuthHandler(authSvc)
-		providerHandler := apiHTTP.NewProviderHandler(providerSvc)
+		providerHandler := apiHTTP.NewProviderHandler(providerSvc, providerFactory, logger.L)
 		wechatHandler := apiHTTP.NewWechatHandler(wechatSvc)
 		taskHandler := apiHTTP.NewTaskHandler(taskSvc)
 		draftHandler := apiHTTP.NewDraftHandler(draftSvc)

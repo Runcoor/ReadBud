@@ -16,6 +16,12 @@ type Event struct {
 	Data interface{} `json:"data"`
 }
 
+// EventPublisher is the interface for publishing SSE events.
+// Both Hub (in-process) and RedisPublisher (cross-process) implement this.
+type EventPublisher interface {
+	Publish(channel string, event Event)
+}
+
 // Hub manages SSE connections for multiple task channels.
 type Hub struct {
 	mu       sync.RWMutex
