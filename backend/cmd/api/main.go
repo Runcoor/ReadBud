@@ -128,6 +128,17 @@ func main() {
 		// Distribution package repository
 		distributionRepo := postgres.NewDistributionPackageRepository(db)
 
+		// Draft version and citation repositories
+		draftVersionRepo := postgres.NewDraftVersionRepository(db)
+		citationRepo := postgres.NewContentCitationRepository(db)
+
+		// Review rule repository
+		reviewRuleRepo := postgres.NewReviewRuleRepository(db)
+
+		// Brand and style profile repositories
+		brandRepo := postgres.NewBrandProfileRepository(db)
+		styleRepo := postgres.NewStyleProfileRepository(db)
+
 		// Stub adapters for development
 		stubPublisher := wechat.NewStubWeChatPublisher(logger.L)
 		stubTokenProv := wechat.NewStubTokenProvider()
@@ -146,6 +157,11 @@ func main() {
 		metricsSvc := service.NewMetricsService(metricsRepo, publishRecordRepo, stubMetricsSync, stubTokenProv, logger.L)
 		topicLibrarySvc := service.NewTopicLibraryService(topicLibraryRepo, taskRepo, metricsRepo, logger.L)
 		distributionSvc := service.NewDistributionService(distributionRepo, draftRepo, blockRepo, stubLLM, logger.L)
+		draftVersionSvc := service.NewDraftVersionService(draftVersionRepo, draftRepo, blockRepo, citationRepo)
+		citationSvc := service.NewCitationService(citationRepo, draftRepo, blockRepo, sourceRepo)
+		reviewRuleSvc := service.NewReviewRuleService(reviewRuleRepo)
+		brandSvc := service.NewBrandProfileService(brandRepo)
+		styleSvc := service.NewStyleProfileService(styleRepo)
 
 		// Handlers
 		authHandler := apiHTTP.NewAuthHandler(authSvc)
@@ -158,6 +174,9 @@ func main() {
 		metricsHandler := apiHTTP.NewMetricsHandler(metricsSvc, wechatRepo)
 		topicHandler := apiHTTP.NewTopicHandler(topicLibrarySvc)
 		distributionHandler := apiHTTP.NewDistributionHandler(distributionSvc)
+		draftVersionHandler := apiHTTP.NewDraftVersionHandler(draftVersionSvc, citationSvc)
+		reviewRuleHandler := apiHTTP.NewReviewRuleHandler(reviewRuleSvc)
+		brandHandler := apiHTTP.NewBrandHandler(brandSvc, styleSvc)
 
 		// Public routes (no auth required)
 		authHandler.RegisterRoutes(v1)
@@ -175,6 +194,9 @@ func main() {
 			metricsHandler.RegisterRoutes(protected)
 			topicHandler.RegisterRoutes(protected)
 			distributionHandler.RegisterRoutes(protected)
+			draftVersionHandler.RegisterRoutes(protected)
+			reviewRuleHandler.RegisterRoutes(protected)
+			brandHandler.RegisterRoutes(protected)
 			protected.GET("/tasks/:id/events", sseHub.ServeHTTP("id"))
 			protected.GET("/tasks/:id/sources", sourceHandler.GetTaskSources)
 		}

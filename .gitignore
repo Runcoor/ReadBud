@@ -43,3 +43,6 @@ logs/
 coverage/
 *.cover
 *.prof
+
+# Temp scripts
+parse_issues.js

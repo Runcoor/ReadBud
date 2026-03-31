@@ -34,6 +34,24 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/brand-profiles',
+    name: 'BrandProfiles',
+    component: () => import('@/pages/BrandProfiles.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/style-profiles',
+    name: 'StyleProfiles',
+    component: () => import('@/pages/StyleProfiles.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/review-rules',
+    name: 'ReviewRules',
+    component: () => import('@/pages/ReviewRules.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/pages/NotFound.vue'),

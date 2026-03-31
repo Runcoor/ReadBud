@@ -14,6 +14,7 @@ declare module 'vue' {
     BlockEditor: typeof import('./components/task/BlockEditor.vue')['default']
     DistributionPanel: typeof import('./components/task/DistributionPanel.vue')['default']
     DraftPreview: typeof import('./components/task/DraftPreview.vue')['default']
+    DraftVersionHistory: typeof import('./components/task/DraftVersionHistory.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCard: typeof import('element-plus/es')['ElCard']
