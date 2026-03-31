@@ -280,10 +280,87 @@ onUnmounted(() => {
   color: $color-text-muted;
 }
 
+// Responsive: Condensed two-column at 1024px
+@media (max-width: $breakpoint-lg) {
+  .workbench-main {
+    grid-template-columns: 280px 1fr 360px;
+  }
+}
+
+// Responsive: Stacked layout at 1024px
 @media (max-width: $breakpoint-md) {
+  .workbench-header {
+    padding: 0 $spacing-base;
+  }
+
+  .header-desc {
+    display: none;
+  }
+
+  .header-divider {
+    display: none;
+  }
+
   .workbench-main {
     grid-template-columns: 1fr;
     overflow-y: auto;
+    padding: $spacing-sm;
+    gap: $spacing-sm;
+  }
+
+  .panel {
+    max-height: none;
+  }
+
+  .panel-body {
+    padding: $spacing-base;
+  }
+
+  .right-placeholder {
+    min-height: 200px;
+    padding: $spacing-xl $spacing-base;
+  }
+}
+
+// Responsive: Compact at 768px
+@media (max-width: $breakpoint-sm) {
+  .workbench-header {
+    height: 48px;
+    padding: 0 $spacing-sm;
+  }
+
+  .header-title {
+    font-size: $font-size-md;
+  }
+
+  .header-actions {
+    gap: 0;
+
+    :deep(.el-button) {
+      padding: $spacing-xs;
+      font-size: $font-size-sm;
+    }
+  }
+
+  .header-user {
+    display: none;
+  }
+
+  .workbench-main {
+    padding: $spacing-xs;
+    gap: $spacing-xs;
+  }
+
+  .panel-header {
+    padding: $spacing-sm $spacing-base;
+  }
+
+  .panel-title {
+    font-size: $font-size-base;
+  }
+
+  .panel-body {
+    padding: $spacing-sm;
   }
 }
 </style>

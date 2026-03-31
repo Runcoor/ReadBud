@@ -106,7 +106,7 @@
     </main>
 
     <!-- Provider Dialog -->
-    <el-dialog v-model="showProviderDialog" title="添加服务配置" width="500">
+    <el-dialog v-model="showProviderDialog" title="添加服务配置" width="500" class="settings-dialog">
       <el-form :model="providerForm" label-position="top" @submit.prevent="handleCreateProvider">
         <el-form-item label="服务类型" required>
           <el-select v-model="providerForm.provider_type" placeholder="选择服务类型" style="width: 100%">
@@ -145,7 +145,7 @@
     </el-dialog>
 
     <!-- WeChat Dialog -->
-    <el-dialog v-model="showWechatDialog" title="添加公众号" width="500">
+    <el-dialog v-model="showWechatDialog" title="添加公众号" width="500" class="settings-dialog">
       <el-form :model="wechatForm" label-position="top" @submit.prevent="handleCreateWechat">
         <el-form-item label="名称" required>
           <el-input v-model="wechatForm.name" placeholder="公众号名称" />
@@ -424,9 +424,62 @@ onMounted(() => {
   align-items: flex-start;
 }
 
-@media (max-width: $breakpoint-sm) {
+// Responsive: Tablet
+@media (max-width: $breakpoint-md) {
   .settings-main {
     padding: $spacing-base;
+    max-width: 100%;
+  }
+
+  .settings-tabs {
+    padding: $spacing-base;
+  }
+
+  // Make tables horizontally scrollable
+  .settings-table {
+    :deep(.el-table) {
+      overflow-x: auto;
+    }
+  }
+}
+
+// Responsive: Mobile
+@media (max-width: $breakpoint-sm) {
+  .settings-header {
+    height: 48px;
+    padding: 0 $spacing-sm;
+  }
+
+  .header-desc {
+    display: none;
+  }
+
+  .header-divider {
+    display: none;
+  }
+
+  .settings-main {
+    padding: $spacing-sm;
+  }
+
+  .settings-tabs {
+    padding: $spacing-sm;
+
+    :deep(.el-tabs__nav-wrap) {
+      padding: 0;
+    }
+  }
+
+  .tab-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-sm;
+    margin-bottom: $spacing-base;
+  }
+
+  // Wrap table columns for narrow screens
+  :deep(.el-table) {
+    font-size: $font-size-sm;
   }
 }
 </style>

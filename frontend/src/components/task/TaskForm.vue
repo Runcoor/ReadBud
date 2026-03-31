@@ -283,4 +283,44 @@ async function handleSubmit(): Promise<void> {
 :deep(.el-slider) {
   padding: 0 $spacing-sm;
 }
+
+// Responsive: Mobile — wrap radio buttons, compact slider
+@media (max-width: $breakpoint-sm) {
+  .form-section-title {
+    font-size: $font-size-xs;
+    margin-bottom: $spacing-sm;
+  }
+
+  :deep(.el-radio-group) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-xs;
+  }
+
+  :deep(.el-radio-button) {
+    flex: 0 0 auto;
+  }
+
+  :deep(.el-radio-button__inner) {
+    padding: $spacing-xs $spacing-sm;
+    font-size: $font-size-xs;
+  }
+
+  :deep(.el-slider) {
+    padding: 0;
+  }
+
+  :deep(.el-slider__marks-text) {
+    font-size: 10px;
+  }
+
+  .submit-btn {
+    height: 40px;
+    font-size: $font-size-base;
+  }
+
+  :deep(.el-divider) {
+    margin: $spacing-base 0;
+  }
+}
 </style>

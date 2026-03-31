@@ -59,3 +59,32 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: $font-weight-semibold;
   line-height: $line-height-tight;
 }
+
+// ============================================================
+// Global Responsive: Element Plus Dialogs
+// ============================================================
+@media (max-width: $breakpoint-sm) {
+  .el-dialog {
+    --el-dialog-width: 90vw !important;
+    width: 90vw !important;
+    margin: 5vh auto !important;
+  }
+
+  .el-dialog__body {
+    padding: $spacing-base !important;
+  }
+
+  .el-dialog__header {
+    padding: $spacing-base $spacing-base $spacing-sm !important;
+  }
+
+  .el-dialog__footer {
+    padding: $spacing-sm $spacing-base $spacing-base !important;
+  }
+
+  // Make el-message-box responsive
+  .el-message-box {
+    width: 85vw !important;
+    max-width: 400px;
+  }
+}

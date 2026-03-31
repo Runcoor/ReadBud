@@ -41,6 +41,7 @@
       v-model="dialogVisible"
       title="编辑区块内容"
       width="600px"
+      class="block-edit-dialog"
       destroy-on-close
     >
       <el-input
@@ -230,6 +231,39 @@ function handleDelete(block: BlockVO): void {
   .text-muted {
     color: $color-text-muted;
     font-style: italic;
+  }
+}
+
+// Responsive: Tablet — show toolbar on touch devices
+@media (max-width: $breakpoint-md) {
+  .block-toolbar {
+    opacity: 1;
+  }
+}
+
+// Responsive: Mobile — stack block header
+@media (max-width: $breakpoint-sm) {
+  .block-header {
+    flex-wrap: wrap;
+    gap: $spacing-xs;
+    padding: $spacing-xs $spacing-sm;
+  }
+
+  .block-heading {
+    flex-basis: 100%;
+    order: 3;
+    white-space: normal;
+    font-size: $font-size-xs;
+  }
+
+  .block-toolbar {
+    opacity: 1;
+    margin-left: auto;
+  }
+
+  .block-content {
+    padding: $spacing-sm;
+    font-size: $font-size-sm;
   }
 }
 </style>

@@ -225,4 +225,29 @@ function formatDate(dateStr: string): string {
   margin: 0;
   padding: $spacing-sm 0;
 }
+
+// Responsive: Mobile — stack score bars, compact layout
+@media (max-width: $breakpoint-sm) {
+  .source-card {
+    padding: $spacing-sm;
+  }
+
+  .source-title-row {
+    gap: $spacing-xs;
+  }
+
+  .source-title {
+    font-size: $font-size-sm;
+  }
+
+  .source-meta {
+    gap: $spacing-sm;
+    flex-wrap: wrap;
+  }
+
+  .score-bars {
+    flex-direction: column;
+    gap: $spacing-sm;
+  }
+}
 </style>

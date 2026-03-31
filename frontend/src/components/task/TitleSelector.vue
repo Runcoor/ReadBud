@@ -83,4 +83,16 @@ function handleSelect(index: number): void {
   color: $color-text-primary;
   line-height: $line-height-normal;
 }
+
+// Responsive: Mobile — compact title cards
+@media (max-width: $breakpoint-sm) {
+  .title-card {
+    padding: $spacing-sm $spacing-md;
+    gap: $spacing-sm;
+  }
+
+  .title-text {
+    font-size: $font-size-sm;
+  }
+}
 </style>

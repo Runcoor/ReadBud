@@ -343,4 +343,45 @@ function formatProgress(percentage: number): string {
   font-size: $font-size-sm;
   color: $color-text-muted;
 }
+
+// Responsive: Mobile — compact pipeline
+@media (max-width: $breakpoint-sm) {
+  .progress-keyword {
+    font-size: $font-size-base;
+  }
+
+  .pipeline-stage {
+    gap: $spacing-sm;
+    min-height: 36px;
+  }
+
+  .stage-indicator {
+    width: 24px;
+  }
+
+  .stage-dot {
+    width: 24px;
+    height: 24px;
+
+    .el-icon {
+      font-size: 12px !important;
+    }
+  }
+
+  .stage-label {
+    font-size: $font-size-sm;
+  }
+
+  .stage-status {
+    font-size: 10px;
+  }
+
+  .progress-empty {
+    padding: $spacing-xl $spacing-base;
+  }
+
+  .empty-text {
+    font-size: $font-size-sm;
+  }
+}
 </style>

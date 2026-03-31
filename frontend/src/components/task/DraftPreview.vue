@@ -330,4 +330,51 @@ watch(
     margin: 0;
   }
 }
+
+// Responsive: When inside stacked layout, make phone frame fluid
+@media (max-width: $breakpoint-md) {
+  .draft-preview {
+    padding: $spacing-base;
+  }
+
+  .phone-frame {
+    width: 100%;
+    max-width: 375px;
+    border-radius: $radius-xl * 2;
+  }
+
+  .empty-state,
+  .loading-state,
+  .error-state {
+    max-width: 100%;
+  }
+}
+
+// Responsive: Mobile — compact phone frame
+@media (max-width: $breakpoint-sm) {
+  .draft-preview {
+    padding: $spacing-sm;
+  }
+
+  .phone-frame {
+    border-radius: $radius-lg;
+    min-height: 400px;
+    border-width: 1px;
+    box-shadow: $shadow-card;
+  }
+
+  .phone-notch {
+    width: 80px;
+    height: 16px;
+  }
+
+  .phone-screen {
+    padding: $spacing-sm;
+    max-height: 60vh;
+  }
+
+  .draft-title {
+    font-size: $font-size-lg;
+  }
+}
 </style>

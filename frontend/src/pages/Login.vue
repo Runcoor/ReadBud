@@ -146,4 +146,43 @@ async function handleLogin() {
     border-color: lighten($color-primary, 8%);
   }
 }
+
+// Responsive: Tablet
+@media (max-width: $breakpoint-md) {
+  .login-container {
+    width: 380px;
+  }
+}
+
+// Responsive: Mobile
+@media (max-width: $breakpoint-sm) {
+  .login-page {
+    padding: $spacing-xl $spacing-base;
+    align-items: flex-start;
+    padding-top: 15vh;
+  }
+
+  .login-container {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .login-header {
+    margin-bottom: $spacing-xl;
+  }
+
+  .login-title {
+    font-size: $font-size-2xl;
+  }
+
+  .login-subtitle {
+    font-size: $font-size-base;
+  }
+
+  .login-card {
+    :deep(.el-card__body) {
+      padding: $spacing-xl $spacing-base;
+    }
+  }
+}
 </style>
