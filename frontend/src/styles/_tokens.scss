@@ -1,47 +1,131 @@
-// ============================================================
-// 阅芽 ReadBud — Design Tokens
-// 大气 / 克制 / 专业 / 可信 / 商务化
-// ============================================================
+// === Design Tokens with CSS Custom Properties & Dark Mode ===
 
-// --- Color Palette ---
-$color-primary: #1B3A5C;          // 深海蓝
-$color-secondary: #4A4A4A;        // 石墨灰
-$color-bg: #F5F7FA;               // 云白
-$color-accent: #5B8DEF;           // 低饱和蓝
-$color-metal: #8C8C8C;            // 金属灰
+// ---------------------------------------------------------------
+// CSS Custom Properties (Light Theme = default)
+// ---------------------------------------------------------------
+:root {
+  // Surfaces
+  --surface-bg: #ffffff;
+  --surface-secondary: #fafafa;
+  --surface-tertiary: #f5f5f5;
+  --surface-hover: #ebebeb;
+  --surface-active: #e0e0e0;
+  --surface-inverse: #1a1a1a;
 
-// --- Semantic Colors ---
-$color-success: #52C41A;
-$color-warning: #FAAD14;
-$color-error: #FF4D4F;
+  // Text
+  --text-primary: #0a0a0a;
+  --text-secondary: #525252;
+  --text-tertiary: #a3a3a3;
+  --text-inverse: #ffffff;
+  --text-placeholder: #c4c4c4;
 
-// --- Text Colors ---
-$color-text-primary: #1F2937;
-$color-text-secondary: #6B7280;
-$color-text-muted: #9CA3AF;
+  // Borders
+  --border-light: #e8e8e8;
+  --border-medium: #d4d4d4;
+  --border-heavy: #a3a3a3;
 
-// --- Border & Divider ---
-$color-border: #E5E7EB;
-$color-divider: #F0F0F0;
+  // Shadows
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
 
-// --- Card & Surface ---
-$color-card-bg: #FFFFFF;
-$shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
-$shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.08);
+  // Glass effect
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-blur: 12px;
+  --glass-bg-heavy: rgba(255, 255, 255, 0.85);
 
-// --- Typography ---
-$font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-  'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial,
-  sans-serif;
+  // Scrollbar
+  --scrollbar-thumb: #d4d4d4;
+  --scrollbar-thumb-hover: #a3a3a3;
+}
 
-$font-size-xs: 12px;
+// ---------------------------------------------------------------
+// Dark Theme Overrides
+// ---------------------------------------------------------------
+[data-theme="dark"] {
+  // Surfaces
+  --surface-bg: #0a0a0a;
+  --surface-secondary: #141414;
+  --surface-tertiary: #1e1e1e;
+  --surface-hover: #2a2a2a;
+  --surface-active: #333333;
+  --surface-inverse: #ffffff;
+
+  // Text
+  --text-primary: #f0f0f0;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #666666;
+  --text-inverse: #0a0a0a;
+  --text-placeholder: #4a4a4a;
+
+  // Borders
+  --border-light: #2a2a2a;
+  --border-medium: #3a3a3a;
+  --border-heavy: #555555;
+
+  // Shadows
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.4);
+
+  // Glass effect
+  --glass-bg: rgba(20, 20, 20, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-bg-heavy: rgba(20, 20, 20, 0.85);
+
+  // Scrollbar
+  --scrollbar-thumb: #3a3a3a;
+  --scrollbar-thumb-hover: #555555;
+}
+
+// ---------------------------------------------------------------
+// SCSS Aliases → CSS Custom Properties (backward compat)
+// ---------------------------------------------------------------
+
+// Surfaces
+$surface-bg: var(--surface-bg);
+$surface-secondary: var(--surface-secondary);
+$surface-tertiary: var(--surface-tertiary);
+$surface-hover: var(--surface-hover);
+$surface-active: var(--surface-active);
+$surface-inverse: var(--surface-inverse);
+
+// Borders
+$border-light: var(--border-light);
+$border-medium: var(--border-medium);
+$border-heavy: var(--border-heavy);
+
+// Text
+$text-primary: var(--text-primary);
+$text-secondary: var(--text-secondary);
+$text-tertiary: var(--text-tertiary);
+$text-inverse: var(--text-inverse);
+$text-placeholder: var(--text-placeholder);
+
+// Shadows
+$shadow-sm: var(--shadow-sm);
+$shadow-md: var(--shadow-md);
+$shadow-lg: var(--shadow-lg);
+
+// Semantic (raw values for Element Plus compatibility)
+$status-success: #22c55e;
+$status-warning: #eab308;
+$status-danger: #ef4444;
+$status-info: #737373;
+
+// Typography
+$font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+$font-mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+
+$font-size-xs: 11px;
 $font-size-sm: 13px;
 $font-size-base: 14px;
 $font-size-md: 16px;
-$font-size-lg: 18px;
-$font-size-xl: 20px;
-$font-size-2xl: 24px;
-$font-size-3xl: 30px;
+$font-size-lg: 20px;
+$font-size-xl: 28px;
+$font-size-2xl: 36px;
+$font-size-3xl: 48px;
 
 $font-weight-normal: 400;
 $font-weight-medium: 500;
@@ -52,7 +136,19 @@ $line-height-tight: 1.25;
 $line-height-normal: 1.5;
 $line-height-relaxed: 1.75;
 
-// --- Spacing ---
+// Spacing (4px grid)
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+$space-5: 20px;
+$space-6: 24px;
+$space-8: 32px;
+$space-10: 40px;
+$space-12: 48px;
+$space-16: 64px;
+
+// Legacy spacing aliases (keep existing components compiling)
 $spacing-xs: 4px;
 $spacing-sm: 8px;
 $spacing-md: 12px;
@@ -63,25 +159,188 @@ $spacing-2xl: 32px;
 $spacing-3xl: 40px;
 $spacing-4xl: 48px;
 
-// --- Border Radius ---
+// Radius
 $radius-sm: 4px;
-$radius-base: 6px;
-$radius-lg: 8px;
-$radius-xl: 12px;
+$radius-md: 8px;
+$radius-base: 8px;
+$radius-lg: 12px;
+$radius-xl: 16px;
+$radius-2xl: 20px;
+$radius-full: 9999px;
+$radius-pill: 9999px;
 
-// --- Breakpoints ---
+// Transitions
+$transition-fast: 120ms ease;
+$transition-base: 150ms ease;
+$transition-slow: 250ms ease;
+
+// Z-index
+$z-background: -1;
+$z-base: 0;
+$z-dropdown: 100;
+$z-sticky: 200;
+$z-overlay: 300;
+$z-modal: 400;
+$z-popover: 400;
+$z-toast: 500;
+
+// Breakpoints
+$bp-sm: 640px;
+$bp-md: 768px;
+$bp-lg: 1024px;
+$bp-xl: 1280px;
+
+// Legacy breakpoint aliases
 $breakpoint-sm: 768px;
 $breakpoint-md: 1024px;
 $breakpoint-lg: 1440px;
 
-// --- Transitions ---
-$transition-fast: 0.15s ease;
-$transition-base: 0.25s ease;
-$transition-slow: 0.35s ease;
+// Legacy aliases (keep existing components compiling)
+$color-primary: var(--text-primary);
+$color-success: #22c55e;
+$color-warning: #eab308;
+$color-danger: #ef4444;
+$color-info: #737373;
+$color-metal: var(--text-secondary);
+$color-bg: var(--surface-bg);
+$color-text: var(--text-primary);
+$color-text-secondary: var(--text-secondary);
+$color-border: var(--border-light);
+$color-secondary: var(--text-secondary);
+$color-accent: var(--text-primary);
+$color-error: #ef4444;
+$color-text-primary: var(--text-primary);
+$color-text-muted: var(--text-tertiary);
+$color-divider: var(--border-light);
+$color-card-bg: var(--surface-bg);
+$shadow-card: var(--shadow-md);
+$shadow-card-hover: var(--shadow-lg);
 
-// --- Z-Index ---
-$z-dropdown: 100;
-$z-sticky: 200;
-$z-modal: 300;
-$z-popover: 400;
-$z-toast: 500;
+// Legacy glass aliases (mapped to theme-aware equivalents)
+$glass-bg: var(--surface-secondary);
+$glass-bg-hover: var(--surface-tertiary);
+$glass-bg-active: var(--surface-hover);
+$glass-bg-elevated: var(--surface-secondary);
+$glass-border: var(--border-light);
+$glass-border-hover: var(--border-medium);
+$glass-border-focus: var(--text-primary);
+$glass-blur: none;
+$glass-shadow: var(--shadow-md);
+$glass-shadow-hover: var(--shadow-lg);
+$glass-inner-glow: none;
+
+// Legacy accent aliases (mapped to theme-aware)
+$accent-primary: var(--surface-inverse);
+$accent-primary-light: var(--text-secondary);
+$accent-primary-glow: rgba(0, 0, 0, 0.08);
+$accent-primary-gradient: var(--surface-inverse);
+$accent-success: #22c55e;
+$accent-success-glow: rgba(34, 197, 94, 0.15);
+$accent-warning: #eab308;
+$accent-warning-glow: rgba(234, 179, 8, 0.15);
+$accent-danger: #ef4444;
+$accent-danger-glow: rgba(239, 68, 68, 0.15);
+$accent-info: #737373;
+$text-disabled: var(--border-medium);
+
+// Legacy font size aliases
+$font-size-4xl: 48px;
+
+// Legacy background aliases
+$bg-gradient-primary: var(--surface-bg);
+$bg-gradient-secondary: var(--surface-bg);
+
+// ---------------------------------------------------------------
+// Mixins
+// ---------------------------------------------------------------
+
+@mixin glass-panel($bg: var(--glass-bg), $border: var(--glass-border)) {
+  background: $bg;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+@mixin glass-panel-solid {
+  background: var(--glass-bg-heavy);
+  border: 1px solid var(--glass-border);
+  border-radius: $radius-lg;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+@mixin glass-input {
+  background: var(--surface-bg);
+  border: 1px solid var(--border-light);
+  border-radius: $radius-md;
+  color: var(--text-primary);
+  transition: all $transition-base;
+
+  &::placeholder {
+    color: var(--text-placeholder);
+  }
+
+  &:hover {
+    border-color: var(--border-medium);
+  }
+
+  &:focus,
+  &.is-focus {
+    border-color: var(--surface-inverse);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
+    outline: none;
+  }
+}
+
+@mixin glass-button-primary {
+  background: var(--surface-inverse);
+  border: 1px solid var(--surface-inverse);
+  color: var(--text-inverse);
+  border-radius: $radius-md;
+  font-weight: $font-weight-medium;
+  transition: all $transition-base;
+
+  &:hover {
+    opacity: 0.85;
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+@mixin glass-button-secondary {
+  background: var(--surface-bg);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  border-radius: $radius-md;
+  transition: all $transition-base;
+
+  &:hover {
+    background: var(--surface-tertiary);
+    border-color: var(--border-medium);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+@mixin glass-button-danger {
+  background: transparent;
+  border: 1px solid transparent;
+  color: $status-danger;
+  border-radius: $radius-md;
+  transition: all $transition-base;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.06);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
