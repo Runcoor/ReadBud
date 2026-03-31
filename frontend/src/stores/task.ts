@@ -91,11 +91,8 @@ export const useTaskStore = defineStore('task', () => {
         return
       }
 
-      // 3. Show most recent task (no SSE)
-      const recentRes = await listTasks(1, 1)
-      if (recentRes.data.items.length > 0) {
-        currentTask.value = recentRes.data.items[0]
-      }
+      // Do NOT load completed tasks into currentTask —
+      // completed tasks belong in the history drawer, not the workbench cards.
     } catch {
       // Silently catch errors during auto-recovery
     }

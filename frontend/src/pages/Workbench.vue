@@ -7,6 +7,11 @@
         <span class="header-desc">内容工作台</span>
       </div>
       <div class="header-actions">
+        <el-tooltip content="历史记录" placement="bottom">
+          <button class="icon-btn" @click="showHistory = !showHistory">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </button>
+        </el-tooltip>
         <el-tooltip content="运营总览" placement="bottom">
           <button class="icon-btn" @click="router.push({ name: 'OverviewReport' })">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/></svg>
@@ -90,6 +95,59 @@
         </div>
       </div>
     </main>
+
+    <!-- History drawer -->
+    <teleport to="body">
+      <div v-if="showHistory" class="history-overlay" @click.self="showHistory = false">
+        <aside class="history-drawer">
+          <div class="drawer-header">
+            <h3>历史记录</h3>
+            <button class="icon-btn" @click="showHistory = false">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="drawer-body">
+            <div v-if="historyLoading" class="drawer-loading">加载中...</div>
+            <div v-else-if="historyTasks.length === 0" class="drawer-empty">暂无历史记录</div>
+            <div v-else class="history-list">
+              <div
+                v-for="task in historyTasks"
+                :key="task.id"
+                class="history-item"
+                @click="openHistoryPreview(task)"
+              >
+                <div class="history-keyword">{{ task.keyword }}</div>
+                <div class="history-meta">
+                  <span class="history-date">{{ formatDate(task.created_at) }}</span>
+                  <el-tag v-if="task.status === 'done'" type="success" size="small">已完成</el-tag>
+                  <el-tag v-else-if="task.status === 'failed'" type="danger" size="small">失败</el-tag>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </teleport>
+
+    <!-- Full-screen preview modal -->
+    <teleport to="body">
+      <div v-if="previewTask" class="fullscreen-preview-overlay">
+        <div class="fullscreen-preview">
+          <div class="preview-toolbar">
+            <div class="preview-title">{{ previewTask.keyword }}</div>
+            <div class="preview-actions">
+              <button class="icon-btn" @click="previewTask = null">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="preview-content">
+            <DraftPreview v-if="previewTask.result_draft_id" :draft-id="previewTask.result_draft_id" />
+            <div v-else class="drawer-empty">该任务没有生成稿件</div>
+          </div>
+        </div>
+      </div>
+    </teleport>
   </div>
 </template>
 
@@ -107,7 +165,8 @@ import DraftPreview from '@/components/task/DraftPreview.vue'
 import PublishPanel from '@/components/task/PublishPanel.vue'
 import DistributionPanel from '@/components/task/DistributionPanel.vue'
 import { getDraft } from '@/api/draft'
-import type { CreateTaskRequest } from '@/types/task'
+import { listTasks } from '@/api/task'
+import type { CreateTaskRequest, TaskVO } from '@/types/task'
 import type { DraftVO } from '@/types/draft'
 
 const router = useRouter()
@@ -117,6 +176,33 @@ const { theme, toggle: toggleTheme } = useTheme()
 const isDarkTheme = computed(() => theme.value === 'dark')
 
 const currentDraft = ref<DraftVO | null>(null)
+
+const showHistory = ref(false)
+const historyTasks = ref<TaskVO[]>([])
+const historyLoading = ref(false)
+const previewTask = ref<TaskVO | null>(null)
+
+// Load history when drawer opens
+watch(showHistory, async (open) => {
+  if (open) {
+    historyLoading.value = true
+    try {
+      const res = await listTasks(1, 50)
+      historyTasks.value = res.data.items.filter(t => t.status === 'done' || t.status === 'failed')
+    } catch { /* ignore */ }
+    finally { historyLoading.value = false }
+  }
+})
+
+function openHistoryPreview(task: TaskVO) {
+  previewTask.value = task
+  showHistory.value = false
+}
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 
 type FocusPanel = 'config' | 'execute' | 'preview'
 const focusPanel = ref<FocusPanel>('config')
@@ -367,5 +453,148 @@ onUnmounted(() => {
   .panel-header { padding: 12px 16px; }
   .panel-title { font-size: 14px; }
   .panel-body { padding: 12px; }
+}
+
+// History drawer
+.history-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: $z-modal;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.history-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  max-width: 90vw;
+  @include glass-panel-solid;
+  border-radius: 0;
+  border-right: none;
+  display: flex;
+  flex-direction: column;
+  z-index: $z-modal;
+  animation: slide-in 0.3s ease;
+}
+
+@keyframes slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-light);
+  h3 { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+}
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.drawer-loading, .drawer-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-item {
+  padding: 14px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  background: var(--surface-tertiary);
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.history-keyword {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.history-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-date {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+// Full-screen preview
+.fullscreen-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: $z-modal;
+  background: var(--surface-secondary);
+  display: flex;
+  flex-direction: column;
+}
+
+.fullscreen-preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.preview-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-primary-sm {
+  padding: 6px 16px;
+  background: var(--text-primary);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 150ms;
+  &:hover { opacity: 0.85; }
+}
+
+.preview-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
 }
 </style>
