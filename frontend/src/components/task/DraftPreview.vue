@@ -32,7 +32,8 @@
               <h1>{{ block.heading || block.text_md }}</h1>
             </div>
             <div v-else-if="block.block_type === 'lead'" class="block block-lead">
-              <div class="lead-box">{{ block.text_md }}</div>
+              <div v-if="block.html_fragment" class="lead-box" v-html="block.html_fragment" />
+              <div v-else class="lead-box" v-html="block.text_md" />
             </div>
             <div v-else-if="block.block_type === 'section'" class="block block-section">
               <h2 v-if="block.heading">{{ block.heading }}</h2>
@@ -41,7 +42,7 @@
                 class="section-body"
                 v-html="block.html_fragment"
               />
-              <p v-else-if="block.text_md" class="section-body">{{ block.text_md }}</p>
+              <div v-else-if="block.text_md" class="section-body" v-html="block.text_md" />
             </div>
             <div v-else-if="block.block_type === 'image'" class="block block-image">
               <img
@@ -68,7 +69,9 @@
               </blockquote>
             </div>
             <div v-else-if="block.block_type === 'cta'" class="block block-cta">
-              <div class="cta-card">
+              <div v-if="block.html_fragment" v-html="block.html_fragment" />
+              <div v-else-if="block.text_md && block.text_md.includes('<')" v-html="block.text_md" />
+              <div v-else class="cta-card">
                 <h3 v-if="block.heading">{{ block.heading }}</h3>
                 <p v-if="block.text_md">{{ block.text_md }}</p>
               </div>
