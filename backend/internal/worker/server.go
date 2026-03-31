@@ -259,21 +259,41 @@ func (s *Server) handleArticleWrite(ctx context.Context, t *asynq.Task) error {
 
 	// Call LLM to write the article
 	content, err := s.callLLM(ctx,
-		`你是一个专业的内容创作者。请根据要求撰写一篇高质量文章。
+		`你是一位拥有十年以上写作经验的资深内容专家，擅长将复杂话题转化为引人入胜、富有洞见的深度文章。你的文字风格兼具专业深度与阅读愉悦感——像一位博学的朋友在跟读者促膝长谈。
+
+写作原则：
+- 观点鲜明：每个段落都有明确的核心论点，不说正确的废话
+- 有血有肉：用真实的案例、数据、场景描写来支撑观点，避免空洞说教
+- 节奏感强：长短句交替，适当使用反问、设问、类比来制造阅读节奏
+- 反常识切入：开头尝试用一个颠覆认知的事实、一个反直觉的观点、或一个具体的场景切入，而非老套的"随着...的发展"
+- 自然表达：像真人在写文章，允许偶尔的口语化表达、个人判断和态度，而非面面俱到的中立客观
+- 结尾有力：结尾给读者一个可执行的行动建议或一个值得深思的问题，而非空洞总结
+
+绝对禁止的 AI 味道：
+- 不要使用"让我们""在当今社会""随着...的发展""总而言之""综上所述"等套话
+- 不要每段都以"首先""其次""最后"来结构化
+- 不要使用排比句超过2组
+- 不要在结尾做大而空的升华
+
+同时，请在文章开头的 lead block 中写一段能立即抓住注意力的开场白（可以是一个震撼数据、一个反常识断言、或一个读者一定有共鸣的场景描写），让人忍不住继续读下去。
+
+在结尾的 cta block 中，设计一段有创意的结尾：不要简单的"关注我们"，而是给出一个具体的、读者今天就能做的小行动，或抛出一个引发思考的好问题。用精美的HTML来呈现这段结尾卡片，使其具有视觉吸引力。
+
 返回严格的JSON格式（不要markdown代码块），结构如下：
 {
-  "title": "文章标题",
-  "digest": "100字以内的文章摘要",
+  "title": "一个让人想点开的标题（可以用冒号分隔主副标题）",
+  "digest": "100字以内的文章摘要，要有信息密度，不要空洞形容词",
+  "cover_prompt": "一段英文提示词，用于AI生成与文章主题匹配的封面图，描述清晰、色彩明亮、构图优美",
   "blocks": [
-    {"type": "lead", "content": "引言段落"},
-    {"type": "section", "heading": "第一节标题", "content": "第一节内容..."},
+    {"type": "lead", "content": "引言段落（抓眼球的开头）"},
+    {"type": "section", "heading": "第一节标题", "content": "第一节正文内容，支持HTML标签如<strong>加粗</strong>、<em>斜体</em>等"},
     {"type": "section", "heading": "第二节标题", "content": "第二节内容..."},
     {"type": "section", "heading": "第三节标题", "content": "第三节内容..."},
-    {"type": "cta", "content": "结尾行动号召"}
+    {"type": "cta", "content": "<div style='background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:16px;padding:32px;color:#fff;text-align:center'><h3 style='margin:0 0 12px;font-size:20px'>结尾卡片标题</h3><p style='margin:0;opacity:0.9;font-size:15px;line-height:1.6'>具体的行动号召或思考问题</p></div>"}
   ]
 }`,
-		fmt.Sprintf("关键词: %s\n目标受众: %s\n语气风格: %s\n目标字数: %d\n\n请撰写文章，确保内容原创、有深度、对读者有实际价值。", task.Keyword, task.Audience, task.Tone, task.TargetWords),
-		4096,
+		fmt.Sprintf("关键词: %s\n目标受众: %s\n语气风格: %s\n目标字数: %d\n\n请开始撰写。记住：写出真正有价值、有洞见、让人读完有收获的好文章，像一位行业专家在分享真知灼见，而不是AI在堆砌信息。", task.Keyword, task.Audience, task.Tone, task.TargetWords),
+		8192,
 	)
 	if err != nil {
 		s.taskSvc.MarkFailed(ctx, p.TaskID, fmt.Sprintf("AI 写作失败: %v", err))
@@ -287,9 +307,10 @@ func (s *Server) handleArticleWrite(ctx context.Context, t *asynq.Task) error {
 		Content string `json:"content"`
 	}
 	type articleOutput struct {
-		Title  string         `json:"title"`
-		Digest string         `json:"digest"`
-		Blocks []articleBlock `json:"blocks"`
+		Title       string         `json:"title"`
+		Digest      string         `json:"digest"`
+		CoverPrompt string         `json:"cover_prompt,omitempty"`
+		Blocks      []articleBlock `json:"blocks"`
 	}
 
 	var article articleOutput
@@ -298,8 +319,8 @@ func (s *Server) handleArticleWrite(ctx context.Context, t *asynq.Task) error {
 		// Fallback: create a simple draft with the raw content
 		s.logger.Warn("failed to parse article JSON, using raw content", zap.Error(err))
 		article = articleOutput{
-			Title:  task.Keyword + " — AI 生成文章",
-			Digest: "AI 自动生成的文章",
+			Title:  task.Keyword,
+			Digest: "由阅芽内容引擎创作",
 			Blocks: []articleBlock{
 				{Type: "lead", Content: content},
 			},
@@ -373,9 +394,21 @@ func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 		return s.enqueueNext(pipeline.TypeChartGen, *p)
 	}
 
-	// Search for images using the keyword
+	// Translate keyword to English for better Pexels results
+	searchQuery := task.Keyword
+	engQuery, engErr := s.callLLM(ctx,
+		"Translate the following keyword to a short English search phrase suitable for stock photo search. Return ONLY the English phrase, nothing else.",
+		task.Keyword,
+		50,
+	)
+	if engErr == nil && len(engQuery) > 0 && len(engQuery) < 100 {
+		searchQuery = engQuery
+		s.logger.Info("image match: translated query", zap.String("original", task.Keyword), zap.String("english", searchQuery))
+	}
+
+	// Search for images
 	imgSvc := pipelinePkg.NewImageService(s.imageSearch, s.imageGen)
-	results, err := imgSvc.SearchAndMatch(ctx, task.Keyword, 3)
+	results, err := imgSvc.SearchAndMatch(ctx, searchQuery, 3)
 	if err != nil {
 		s.logger.Warn("image match: search failed, continuing without images", zap.Error(err))
 		return s.enqueueNext(pipeline.TypeChartGen, *p)
@@ -400,8 +433,8 @@ func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 	imgIdx := 0
 	for i, block := range blocks {
 		if block.BlockType == "section" && imgIdx < len(results) {
-			imgTag := fmt.Sprintf(`<img src="%s" alt="%s" width="%d" style="width:100%%;border-radius:8px;margin:12px 0" />`,
-				results[imgIdx].URL, task.Keyword, results[imgIdx].Width)
+			imgTag := fmt.Sprintf(`<figure style="margin:20px 0;text-align:center"><img src="%s" alt="%s" style="width:100%%;max-width:100%%;border-radius:12px;display:block" /><figcaption style="font-size:12px;color:#999;margin-top:8px">图片来源: Pexels</figcaption></figure>`,
+				results[imgIdx].URL, task.Keyword)
 
 			existing := ""
 			if block.HTMLFragment != nil {
