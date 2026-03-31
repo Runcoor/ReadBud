@@ -12,14 +12,21 @@ export function getTask(id: string): Promise<ApiResponse<TaskVO>> {
   return get<ApiResponse<TaskVO>>(`/tasks/${id}`)
 }
 
-/** List recent tasks with pagination */
-export function listTasks(page = 1, pageSize = 20): Promise<ApiResponse<TaskListResponse>> {
-  return get<ApiResponse<TaskListResponse>>('/tasks', { params: { page, page_size: pageSize } })
+/** List recent tasks with pagination and optional status filter */
+export function listTasks(page = 1, pageSize = 20, status?: string): Promise<ApiResponse<TaskListResponse>> {
+  const params: Record<string, unknown> = { page, page_size: pageSize }
+  if (status) params.status = status
+  return get<ApiResponse<TaskListResponse>>('/tasks', { params })
 }
 
 /** Retry a failed task */
 export function retryTask(id: string): Promise<ApiResponse<TaskVO>> {
   return post<ApiResponse<TaskVO>>(`/tasks/${id}/retry`)
+}
+
+/** Cancel a pending or running task */
+export function cancelTask(id: string): Promise<ApiResponse<null>> {
+  return post<ApiResponse<null>>(`/tasks/${id}/cancel`)
 }
 
 /**

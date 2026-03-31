@@ -50,6 +50,9 @@ const StatusRunning = "running"
 // Task status: done marks a completed task.
 const StatusDone = "done"
 
+// Task status: cancelled marks a user-cancelled task.
+const StatusCancelled = "cancelled"
+
 // Task stage constants (pipeline stages).
 const (
 	StageKeywordExpand = "keyword_expand"

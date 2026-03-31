@@ -5,6 +5,7 @@ export type TaskStatus =
   | 'running'
   | 'done'
   | 'failed'
+  | 'cancelled'
 
 export type TaskStage =
   | 'keyword_expand'
@@ -87,6 +88,7 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   running: '执行中',
   done: '已完成',
   failed: '失败',
+  cancelled: '已取消',
 }
 
 /** Status tag type for Element Plus */
@@ -95,6 +97,7 @@ export const STATUS_TAG_TYPES: Record<TaskStatus, '' | 'success' | 'warning' | '
   running: '',
   done: 'success',
   failed: 'danger',
+  cancelled: 'warning',
 }
 
 /** Image mode labels */

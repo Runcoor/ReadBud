@@ -29,6 +29,7 @@ func (h *TaskHandler) RegisterRoutes(rg *gin.RouterGroup) {
 		tasks.GET("", h.List)
 		tasks.GET("/:id", h.Get)
 		tasks.POST("/:id/retry", h.Retry)
+		tasks.POST("/:id/cancel", h.CancelTask)
 	}
 }
 
@@ -82,13 +83,35 @@ func (h *TaskHandler) List(c *gin.Context) {
 		pageSize = 100
 	}
 
-	resp, err := h.taskService.ListRecent(c.Request.Context(), page, pageSize)
+	status := c.Query("status")
+
+	resp, err := h.taskService.ListRecent(c.Request.Context(), page, pageSize, status)
 	if err != nil {
 		apiPkg.InternalError(c, "获取任务列表失败")
 		return
 	}
 
 	apiPkg.OK(c, resp)
+}
+
+// CancelTask handles POST /api/v1/tasks/:id/cancel.
+func (h *TaskHandler) CancelTask(c *gin.Context) {
+	publicID := c.Param("id")
+
+	if err := h.taskService.CancelTask(c.Request.Context(), publicID); err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			apiPkg.NotFound(c, "任务不存在")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidState) {
+			apiPkg.BadRequest(c, "当前任务状态不支持取消")
+			return
+		}
+		apiPkg.InternalError(c, "取消任务失败")
+		return
+	}
+
+	apiPkg.OK(c, nil)
 }
 
 // Retry handles POST /api/v1/tasks/:id/retry.
