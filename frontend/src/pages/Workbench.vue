@@ -41,11 +41,28 @@
 
       <aside class="panel panel-right">
         <div class="panel-header">
-          <h2 class="panel-title">文章预览</h2>
+          <div class="panel-header-row">
+            <h2 class="panel-title">文章预览</h2>
+            <el-tag v-if="taskStore.isDone" type="success" size="small" effect="plain">已完成</el-tag>
+          </div>
         </div>
-        <div class="panel-body">
-          <!-- DraftPreview + PublishPanel will go here (HY-315, HY-324) -->
-          <el-empty description="文章预览待实现" :image-size="80" />
+        <div class="panel-body panel-body-right">
+          <div v-if="taskStore.isDone && taskStore.currentTask?.result_draft_id" class="right-content">
+            <DraftPreview :draft-id="taskStore.currentTask.result_draft_id" />
+            <div class="publish-divider" />
+            <PublishPanel :draft="currentDraft" />
+          </div>
+          <div v-else-if="taskStore.isRunning" class="right-placeholder">
+            <el-skeleton :rows="6" animated />
+            <p class="placeholder-text">文章生成中，请稍候...</p>
+          </div>
+          <div v-else class="right-placeholder">
+            <div class="empty-preview-icon">
+              <el-icon :size="48" color="#D1D5DB"><Document /></el-icon>
+            </div>
+            <p class="placeholder-text">任务完成后将在此显示文章预览</p>
+            <p class="placeholder-sub">支持逐段编辑、图片替换和一键发布</p>
+          </div>
         </div>
       </aside>
     </main>
@@ -53,18 +70,43 @@
 </template>
 
 <script setup lang="ts">
-import { onUnmounted } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTaskStore } from '@/stores/task'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Document } from '@element-plus/icons-vue'
 import TaskForm from '@/components/task/TaskForm.vue'
 import TaskProgress from '@/components/task/TaskProgress.vue'
+import DraftPreview from '@/components/task/DraftPreview.vue'
+import PublishPanel from '@/components/task/PublishPanel.vue'
+import { getDraft } from '@/api/draft'
 import type { CreateTaskRequest } from '@/types/task'
+import type { DraftVO } from '@/types/draft'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const taskStore = useTaskStore()
+
+const currentDraft = ref<DraftVO | null>(null)
+
+// Fetch draft when task completes
+watch(
+  () => taskStore.currentTask?.result_draft_id,
+  async (draftId) => {
+    if (draftId) {
+      try {
+        const res = await getDraft(draftId)
+        currentDraft.value = res.data
+      } catch {
+        currentDraft.value = null
+      }
+    } else {
+      currentDraft.value = null
+    }
+  },
+  { immediate: true },
+)
 
 async function handleCreateTask(payload: CreateTaskRequest): Promise<void> {
   try {
@@ -182,6 +224,56 @@ onUnmounted(() => {
   flex: 1;
   padding: $spacing-lg;
   overflow-y: auto;
+}
+
+.panel-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-body-right {
+  display: flex;
+  flex-direction: column;
+}
+
+.right-content {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.publish-divider {
+  height: 1px;
+  background-color: $color-divider;
+  margin: $spacing-sm 0;
+}
+
+.right-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 300px;
+  text-align: center;
+  padding: $spacing-2xl $spacing-lg;
+}
+
+.empty-preview-icon {
+  margin-bottom: $spacing-lg;
+  opacity: 0.5;
+}
+
+.placeholder-text {
+  font-size: $font-size-base;
+  color: $color-text-secondary;
+  margin-bottom: $spacing-xs;
+}
+
+.placeholder-sub {
+  font-size: $font-size-sm;
+  color: $color-text-muted;
 }
 
 @media (max-width: $breakpoint-md) {

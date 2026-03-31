@@ -100,18 +100,24 @@ func main() {
 		providerRepo := postgres.NewProviderConfigRepository(db)
 		wechatRepo := postgres.NewWechatAccountRepository(db)
 		taskRepo := postgres.NewTaskRepository(db)
+		draftRepo := postgres.NewArticleDraftRepository(db)
+		blockRepo := postgres.NewArticleBlockRepository(db)
+		sourceRepo := postgres.NewSourceDocumentRepository(db)
 
 		// Services
 		authSvc := service.NewAuthService(userRepo, jwtCfg)
 		providerSvc := service.NewProviderConfigService(providerRepo, encSecret)
 		wechatSvc := service.NewWechatAccountService(wechatRepo, encSecret)
 		taskSvc := service.NewTaskService(taskRepo, sseHub)
+		draftSvc := service.NewDraftService(draftRepo, blockRepo, sourceRepo, taskRepo)
 
 		// Handlers
 		authHandler := apiHTTP.NewAuthHandler(authSvc)
 		providerHandler := apiHTTP.NewProviderHandler(providerSvc)
 		wechatHandler := apiHTTP.NewWechatHandler(wechatSvc)
 		taskHandler := apiHTTP.NewTaskHandler(taskSvc)
+		draftHandler := apiHTTP.NewDraftHandler(draftSvc)
+		sourceHandler := apiHTTP.NewSourceHandler(draftSvc)
 
 		// Public routes (no auth required)
 		authHandler.RegisterRoutes(v1)
@@ -124,7 +130,9 @@ func main() {
 			providerHandler.RegisterRoutes(protected)
 			wechatHandler.RegisterRoutes(protected)
 			taskHandler.RegisterRoutes(protected)
+			draftHandler.RegisterRoutes(protected)
 			protected.GET("/tasks/:id/events", sseHub.ServeHTTP("id"))
+			protected.GET("/tasks/:id/sources", sourceHandler.GetTaskSources)
 		}
 	} else {
 		// Fallback when DB is unavailable
