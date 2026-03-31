@@ -607,41 +607,78 @@ func (s *Server) handleChartGen(ctx context.Context, t *asynq.Task) error {
 	}
 
 	// LLM visual enhancement round
-	enhancePrompt := `你是一位顶尖的微信公众号视觉设计师，专门为文章添加精美的HTML装饰元素，让排版媲美头部公众号。
+	// Randomly select a visual style for variety
+	visualStyles := []string{
+		"有机呼吸风：柔和的blob形状、手绘感曲线、粉紫青渐变、轻雾面质感。形状如有机物在缓慢呼吸，边缘柔软模糊。",
+		"极简科技风：深色卡片+霓虹描边、精密几何SVG图标、蓝紫渐变辉光、数据面板质感。冷峻但不冰冷。",
+		"自然手账风：米色/暖白底色、水彩渐变色块、圆润胶囊标签、手写体标题装饰线。温暖亲切如纸质手账。",
+		"品牌杂志风：大胆撞色、粗体序号、几何色块分区、全宽色带标题栏。像一本精心排版的生活方式杂志。",
+		"学术优雅风：深蓝/墨绿主色、精致细线框、serif风格序号、脚注式引用卡片。严谨又不失美感。",
+		"创意工作室风：不规则圆角卡片、渐变色投影、SVG波浪分隔线、略带倾斜的标签元素。活泼但不幼稚。",
+		"赛博朋克风：暗底+荧光绿/粉/蓝高亮、终端代码框样式、扫描线纹理叠层、数据流视觉隐喻。未来感十足。",
+	}
+	// Use task ID for deterministic but varied selection
+	styleIdx := int(p.TaskID) % len(visualStyles)
+	selectedStyle := visualStyles[styleIdx]
 
-你的任务：分析下面的文章结构，为每个block生成富有设计感的HTML。所有样式必须使用inline style（微信公众号不支持class和外部CSS）。
+	enhancePrompt := fmt.Sprintf(`你是一位顶级的微信公众号视觉排版设计师，拥有极高的审美品味。你的使命是将普通文章变成让人忍不住截图分享的精美作品。
 
-设计规范：
-1. **标题装饰**：每个section标题前加序号装饰，如彩色圆形序号、装饰线条、图标等。序号样式要有变化，不要全部一样。
-2. **内容增强**：在适当位置添加：
-   - 重点语句用彩色高亮框（不是全部加粗，而是选择性地用背景色+圆角框突出关键句子）
-   - 数据/对比信息用卡片或表格展示
-   - 并列观点用带图标的列表卡片
-   - 引用或名言用左边框引用样式
-3. **视觉节奏**：每2-3段之间插入一个视觉元素（分隔线、tips框、信息卡片、关键数据卡片等），避免大段纯文字
-4. **开头装饰**：lead block 开头添加一个品牌装饰元素（如渐变色分隔线、装饰图标等）
-5. **动态感**：适当使用 emoji 作为段落图标（但不要过多，每篇3-5个即可）
-6. **配色方案**：根据文章主题自动选择一个配色方案（如科技蓝#4F46E5、自然绿#059669、温暖橙#EA580C等），整篇文章保持配色统一
-7. **CTA 结尾**：如果已有CTA block，优化其HTML设计；如果没有，在最后添加一个精美的引导关注卡片
+本次设计风格指令：%s
 
-禁止：
-- 不要改变文章的文字内容和含义
-- 不要删除已有的图片（<img>标签保留）
-- 不要使用CSS class，所有样式都用inline style
+## 核心设计原则
+
+### 图标系统（严禁使用emoji）
+所有图标必须使用内联SVG。为每个场景设计恰当的SVG图标：
+- 序号标识：用主题色圆形/圆角矩形包裹数字，或用svg绘制创意序号
+- 段落图标：根据内容含义用svg绘制简洁的示意图标（如灯泡表示观点、图表表示数据、箭头表示趋势等）
+- 装饰图标：svg绘制的小装饰元素（星星、圆点、曲线等）
+- SVG保持简洁：每个图标不超过3-4个path，viewBox统一用"0 0 24 24"，stroke-width用"1.5"或"2"
+
+### 视觉材质
+- 多值圆角（border-radius: 20px 8px 20px 8px 这样的不规则圆角）
+- 柔和渐变（linear-gradient 使用2-3个相近色，角度135deg或180deg）
+- 轻透明叠层（rgba背景 + 细描边）
+- 阴影用多层柔和投影（0 2px 12px rgba(...)）而非单层硬阴影
+- 绝对不要用1px solid #000这种生硬线条
+
+### 动画（微信公众号支持CSS animation）
+在关键元素上添加微动画：
+- 卡片：悬浮感（@keyframes float { 0%%,100%% { transform:translateY(0) } 50%% { transform:translateY(-4px) } }），6-10秒周期
+- 渐变色块：色彩缓慢流动（background-size:200%% + @keyframes gradient-shift）
+- 装饰元素：缓慢旋转或脉冲（@keyframes pulse-soft）
+- 注意：animation写在inline style里，@keyframes用<style>标签包裹放在HTML开头
+
+### 版式节奏
+- lead开头：品牌装饰条（渐变色svg波浪线或自定义形状）+ 精排首段
+- 每个section：创意序号 + 标题装饰（如背景色块、下划线动画、侧边装饰条）
+- 正文中：选择性高亮（渐变背景的inline highlight，不要全部加粗）
+- 重要观点：独立卡片展示（圆角+渐变背景+svg图标+投影）
+- 数据/对比：设计信息卡片或小型数据面板
+- 每2-3段之间：插入一个视觉呼吸元素（svg波浪分隔线、创意引用框、tips卡片等）
+- CTA结尾：设计一个精美的行动号召卡片——使用曲线clip-path裁剪的形状、blob渐变背景、柔和投影
+
+### 配色
+根据文章主题和选定风格，自创一组和谐配色（主色+辅色+点缀色+背景色）。不要使用固定的蓝紫粉——每篇文章的配色都应该不同且与内容呼应。
+
+## 技术约束
+- 所有样式使用inline style（微信不支持class）
+- @keyframes动画放在开头的<style>标签内（这是唯一允许的非inline样式）
 - 不要使用JavaScript
-- 图片标签保留原样不要修改
+- 不要改变文字内容和含义
+- 已有的<img>和<figure>标签保留原样
+- SVG直接内联在HTML中，不要用外部引用
 
-返回严格JSON格式（不要markdown代码块）：
+## 输出格式
+返回严格JSON（不要markdown代码块）：
 {
-  "color_scheme": "主色调hex值",
+  "style_name": "风格名称",
+  "color_scheme": {"primary": "#xxx", "secondary": "#xxx", "accent": "#xxx", "bg": "#xxx"},
+  "animation_css": "<style>这里放所有@keyframes定义</style>",
   "blocks": [
-    {"index": 0, "html": "完整的HTML内容（包含原文+装饰）"},
-    {"index": 1, "html": "..."},
-    ...
+    {"index": 0, "html": "该block的完整HTML（包含原始文字+所有装饰元素+SVG图标+动画）"},
+    {"index": 1, "html": "..."}
   ]
-}
-
-每个block的html字段应该是该block的完整HTML渲染结果，包含原始文字内容+你添加的所有装饰元素。`
+}`, selectedStyle)
 
 	enhanceContent, err := s.callLLM(ctx, enhancePrompt, articleSummary.String(), 8192)
 	if err != nil {
@@ -654,9 +691,17 @@ func (s *Server) handleChartGen(ctx context.Context, t *asynq.Task) error {
 		Index int    `json:"index"`
 		HTML  string `json:"html"`
 	}
+	type enhanceColorScheme struct {
+		Primary   string `json:"primary"`
+		Secondary string `json:"secondary"`
+		Accent    string `json:"accent"`
+		Bg        string `json:"bg"`
+	}
 	type enhanceOutput struct {
-		ColorScheme string         `json:"color_scheme"`
-		Blocks      []enhanceBlock `json:"blocks"`
+		StyleName    string              `json:"style_name"`
+		ColorScheme  json.RawMessage     `json:"color_scheme"`
+		AnimationCSS string              `json:"animation_css"`
+		Blocks       []enhanceBlock      `json:"blocks"`
 	}
 
 	var enhanced enhanceOutput
@@ -668,6 +713,11 @@ func (s *Server) handleChartGen(ctx context.Context, t *asynq.Task) error {
 
 	// Apply enhanced HTML to blocks
 	applied := 0
+
+	// Prepend animation CSS to the first block if provided
+	animCSS := enhanced.AnimationCSS
+	firstBlockDone := false
+
 	for _, eb := range enhanced.Blocks {
 		if eb.Index >= 0 && eb.Index < len(blocks) && eb.HTML != "" {
 			// Preserve existing images
@@ -679,7 +729,6 @@ func (s *Server) handleChartGen(ctx context.Context, t *asynq.Task) error {
 			// If existing has images, merge them into the new HTML
 			newHTML := eb.HTML
 			if strings.Contains(existingHTML, "<figure") || strings.Contains(existingHTML, "<img") {
-				// Extract figure/img tags from existing and prepend
 				imgStart := strings.Index(existingHTML, "<figure")
 				if imgStart == -1 {
 					imgStart = strings.Index(existingHTML, "<img")
@@ -693,13 +742,21 @@ func (s *Server) handleChartGen(ctx context.Context, t *asynq.Task) error {
 				}
 			}
 
+			// Prepend animation CSS to the very first enhanced block
+			if !firstBlockDone && animCSS != "" {
+				newHTML = animCSS + newHTML
+				firstBlockDone = true
+			}
+
 			blocks[eb.Index].HTMLFragment = &newHTML
 			s.blockRepo.Update(ctx, &blocks[eb.Index])
 			applied++
 		}
 	}
 
-	s.logger.Info("visual enhance: applied", zap.Int("blocks_enhanced", applied), zap.String("color_scheme", enhanced.ColorScheme))
+	s.logger.Info("visual enhance: applied",
+		zap.Int("blocks_enhanced", applied),
+		zap.String("style", enhanced.StyleName))
 	return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
 }
 
