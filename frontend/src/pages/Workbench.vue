@@ -34,7 +34,7 @@
     <main class="workbench-main">
       <div class="card-stack">
         <!-- Config card -->
-        <div class="stack-card" :class="getCardClass('config')" @click="focusPanel = 'config'">
+        <div class="stack-card" :class="getCardClass('config')">
           <div class="card-inner">
             <div class="panel-header"><span class="panel-title">任务配置</span></div>
             <div class="panel-body">
@@ -47,7 +47,7 @@
           </div>
         </div>
         <!-- Execute card -->
-        <div class="stack-card" :class="getCardClass('execute')" @click="focusPanel = 'execute'">
+        <div class="stack-card" :class="getCardClass('execute')">
           <div class="card-inner">
             <div class="panel-header"><span class="panel-title">执行流程</span></div>
             <div class="panel-body">
@@ -60,7 +60,7 @@
           </div>
         </div>
         <!-- Preview card -->
-        <div class="stack-card" :class="getCardClass('preview')" @click="focusPanel = 'preview'">
+        <div class="stack-card" :class="getCardClass('preview')">
           <div class="card-inner">
             <div class="panel-header">
               <span class="panel-title">文章预览</span>
@@ -121,12 +121,15 @@ const currentDraft = ref<DraftVO | null>(null)
 type FocusPanel = 'config' | 'execute' | 'preview'
 const focusPanel = ref<FocusPanel>('config')
 
-// Auto-focus follows task state
+// Focus is purely state-driven — no manual click switching
 watch(() => taskStore.currentTask?.status, (status) => {
-  if (!status) { focusPanel.value = 'config'; return }
+  if (!status || status === 'failed' || status === 'cancelled') {
+    focusPanel.value = 'config'
+    return
+  }
   if (status === 'pending' || status === 'running') focusPanel.value = 'execute'
   else if (status === 'done') focusPanel.value = 'preview'
-})
+}, { immediate: true })
 
 function getCardClass(panel: FocusPanel) {
   if (focusPanel.value === panel) return 'stack-card--focus'
@@ -269,7 +272,6 @@ onUnmounted(() => {
 
 .stack-card {
   transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
   overflow: hidden;
 
   &--focus {
