@@ -46,7 +46,7 @@ func (h *PublishHandler) RegisterRoutes(rg *gin.RouterGroup) {
 func (h *PublishHandler) CreateJob(c *gin.Context) {
 	var req dto.CreatePublishJobRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiPkg.BadRequest(c, "请输入有效的发布参数")
+		apiPkg.HandleBindError(c, err)
 		return
 	}
 
@@ -123,7 +123,11 @@ func (h *PublishHandler) RetryJob(c *gin.Context) {
 			apiPkg.NotFound(c, "发布任务不存在")
 			return
 		}
-		apiPkg.BadRequest(c, err.Error())
+		if errors.Is(err, service.ErrInvalidState) {
+			apiPkg.BadRequest(c, "当前任务状态不支持重试")
+			return
+		}
+		apiPkg.InternalError(c, "重试发布任务失败")
 		return
 	}
 
@@ -143,7 +147,11 @@ func (h *PublishHandler) CancelJob(c *gin.Context) {
 			apiPkg.NotFound(c, "发布任务不存在")
 			return
 		}
-		apiPkg.BadRequest(c, err.Error())
+		if errors.Is(err, service.ErrInvalidState) {
+			apiPkg.BadRequest(c, "当前任务状态不支持取消")
+			return
+		}
+		apiPkg.InternalError(c, "取消发布任务失败")
 		return
 	}
 

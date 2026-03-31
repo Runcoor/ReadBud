@@ -6,9 +6,9 @@ import "encoding/json"
 type ProviderConfigRequest struct {
 	ProviderType string          `json:"provider_type" binding:"required,oneof=llm image_search image_gen search storage crawler"`
 	ProviderName string          `json:"provider_name" binding:"required,min=1,max=64"`
-	ConfigJSON   json.RawMessage `json:"config_json"`
+	ConfigJSON   json.RawMessage `json:"config_json" binding:"required"`
 	SecretJSON   string          `json:"secret_json,omitempty"`
-	Status       *int16          `json:"status,omitempty"`
+	Status       *int16          `json:"status,omitempty" binding:"omitempty,min=0,max=1"`
 }
 
 // ProviderConfigVO is the view object for provider config (secrets masked).
@@ -28,7 +28,7 @@ type WechatAccountRequest struct {
 	AppSecret string `json:"app_secret,omitempty"`
 	TokenMode string `json:"token_mode" binding:"required,oneof=direct stable gateway_v2"`
 	IsDefault bool   `json:"is_default"`
-	Remark    string `json:"remark"`
+	Remark    string `json:"remark" binding:"omitempty,max=500"`
 }
 
 // WechatAccountVO is the view object for WeChat account (secrets masked).

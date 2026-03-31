@@ -38,7 +38,7 @@ func (h *ContentImageHandler) UploadDraftImages(c *gin.Context) {
 
 	var req uploadDraftImagesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiPkg.BadRequest(c, "请提供公众号app_id")
+		apiPkg.HandleBindError(c, err)
 		return
 	}
 

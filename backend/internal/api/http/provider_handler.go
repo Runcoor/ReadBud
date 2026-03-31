@@ -44,7 +44,7 @@ func (h *ProviderHandler) List(c *gin.Context) {
 func (h *ProviderHandler) Create(c *gin.Context) {
 	var req dto.ProviderConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiPkg.BadRequest(c, "请求参数不正确")
+		apiPkg.HandleBindError(c, err)
 		return
 	}
 
@@ -61,7 +61,7 @@ func (h *ProviderHandler) Update(c *gin.Context) {
 	publicID := c.Param("id")
 	var req dto.ProviderConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiPkg.BadRequest(c, "请求参数不正确")
+		apiPkg.HandleBindError(c, err)
 		return
 	}
 

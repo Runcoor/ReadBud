@@ -34,7 +34,7 @@ func (h *AuthHandler) RegisterRoutes(rg *gin.RouterGroup) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiPkg.BadRequest(c, "请输入正确的用户名和密码")
+		apiPkg.HandleBindError(c, err)
 		return
 	}
 

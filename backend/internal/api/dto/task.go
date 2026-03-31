@@ -5,14 +5,14 @@ import "time"
 // CreateTaskRequest is the DTO for POST /api/v1/tasks.
 type CreateTaskRequest struct {
 	Keyword         string     `json:"keyword" binding:"required,min=1,max=255"`
-	Audience        string     `json:"audience" binding:"max=255"`
-	Tone            string     `json:"tone" binding:"max=64"`
-	TargetWords     int        `json:"target_words" binding:"min=500,max=20000"`
+	Audience        string     `json:"audience" binding:"omitempty,max=255"`
+	Tone            string     `json:"tone" binding:"omitempty,max=64"`
+	TargetWords     int        `json:"target_words" binding:"omitempty,min=500,max=20000"`
 	ImageMode       string     `json:"image_mode" binding:"required,oneof=auto search_only generate_only"`
-	ChartMode       int16      `json:"chart_mode"`
+	ChartMode       int16      `json:"chart_mode" binding:"omitempty,min=0,max=2"`
 	PublishMode     string     `json:"publish_mode" binding:"required,oneof=manual now schedule"`
 	PublishAt       *time.Time `json:"publish_at,omitempty"`
-	WechatAccountID *string    `json:"wechat_account_id,omitempty"`
+	WechatAccountID *string    `json:"wechat_account_id,omitempty" binding:"omitempty,min=1,max=64"`
 }
 
 // TaskVO is the view object for task display.

@@ -36,7 +36,7 @@ func (h *TaskHandler) RegisterRoutes(rg *gin.RouterGroup) {
 func (h *TaskHandler) Create(c *gin.Context) {
 	var req dto.CreateTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiPkg.BadRequest(c, "请输入有效的任务参数")
+		apiPkg.HandleBindError(c, err)
 		return
 	}
 
@@ -71,6 +71,17 @@ func (h *TaskHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
+	// Clamp pagination values
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
 	resp, err := h.taskService.ListRecent(c.Request.Context(), page, pageSize)
 	if err != nil {
 		apiPkg.InternalError(c, "获取任务列表失败")
@@ -90,7 +101,11 @@ func (h *TaskHandler) Retry(c *gin.Context) {
 			apiPkg.NotFound(c, "任务不存在")
 			return
 		}
-		apiPkg.BadRequest(c, err.Error())
+		if errors.Is(err, service.ErrInvalidState) {
+			apiPkg.BadRequest(c, "当前任务状态不支持重试")
+			return
+		}
+		apiPkg.InternalError(c, "重试任务失败")
 		return
 	}
 

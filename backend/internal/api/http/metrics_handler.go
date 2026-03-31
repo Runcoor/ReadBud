@@ -40,7 +40,7 @@ type syncMetricsRequest struct {
 func (h *MetricsHandler) SyncMetrics(c *gin.Context) {
 	var req syncMetricsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.BadRequest(c, "请求参数错误: "+err.Error())
+		api.HandleBindError(c, err)
 		return
 	}
 
@@ -57,7 +57,7 @@ func (h *MetricsHandler) SyncMetrics(c *gin.Context) {
 
 	result, err := h.metricsSvc.SyncMetrics(c.Request.Context(), account.ID, account.AppID)
 	if err != nil {
-		api.InternalError(c, "同步指标失败: "+err.Error())
+		api.InternalError(c, "同步指标失败")
 		return
 	}
 

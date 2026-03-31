@@ -34,7 +34,7 @@ func (h *DistributionHandler) RegisterRoutes(rg *gin.RouterGroup) {
 func (h *DistributionHandler) Generate(c *gin.Context) {
 	var req service.GenerateDistributionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.BadRequest(c, "请求参数错误: "+err.Error())
+		api.HandleBindError(c, err)
 		return
 	}
 

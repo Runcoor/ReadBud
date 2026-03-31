@@ -44,7 +44,7 @@ func (h *WechatHandler) List(c *gin.Context) {
 func (h *WechatHandler) Create(c *gin.Context) {
 	var req dto.WechatAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiPkg.BadRequest(c, "请求参数不正确")
+		apiPkg.HandleBindError(c, err)
 		return
 	}
 
@@ -61,7 +61,7 @@ func (h *WechatHandler) Update(c *gin.Context) {
 	publicID := c.Param("id")
 	var req dto.WechatAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiPkg.BadRequest(c, "请求参数不正确")
+		apiPkg.HandleBindError(c, err)
 		return
 	}
 

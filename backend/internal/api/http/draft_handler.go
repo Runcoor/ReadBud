@@ -53,7 +53,7 @@ func (h *DraftHandler) Update(c *gin.Context) {
 
 	var req dto.UpdateDraftRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiPkg.BadRequest(c, "请输入有效的更新参数")
+		apiPkg.HandleBindError(c, err)
 		return
 	}
 
@@ -77,7 +77,7 @@ func (h *DraftHandler) UpdateBlock(c *gin.Context) {
 
 	var req dto.UpdateBlockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiPkg.BadRequest(c, "请输入有效的更新参数")
+		apiPkg.HandleBindError(c, err)
 		return
 	}
 

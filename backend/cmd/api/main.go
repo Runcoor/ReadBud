@@ -77,7 +77,14 @@ func main() {
 	// Create Gin router
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(middleware.RequestID())
 	r.Use(corsMiddleware())
+	r.Use(middleware.RequestSizeLimit(middleware.DefaultMaxBodySize))
+	r.Use(middleware.RequestLogger())
+
+	// Audit service for business operation tracking
+	auditSvc := service.NewAuditService(logger.L)
+	_ = auditSvc // Available for handler injection when needed
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
@@ -174,7 +181,7 @@ func main() {
 	} else {
 		// Fallback when DB is unavailable
 		v1.POST("/auth/login", func(c *gin.Context) {
-			api.Error(c, 503, 503, "数据库不可用，请稍后重试")
+			api.ServiceUnavailable(c, "数据库不可用，请稍后重试")
 		})
 	}
 
@@ -203,7 +210,7 @@ func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Request-ID")
 		c.Header("Access-Control-Max-Age", "86400")
 
 		if c.Request.Method == "OPTIONS" {

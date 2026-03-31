@@ -35,11 +35,35 @@ func (h *TopicHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	}
 }
 
+// allowedSortFields defines valid sort fields for topic listing.
+var allowedSortFields = map[string]bool{
+	"recommend_weight": true,
+	"created_at":       true,
+	"updated_at":       true,
+	"keyword":          true,
+}
+
 // ListTopics handles GET /api/v1/reports/topics — paginated topic list.
 func (h *TopicHandler) ListTopics(c *gin.Context) {
 	page := queryInt(c, "page", 1)
 	size := queryInt(c, "size", 20)
 	sortBy := c.DefaultQuery("sort_by", "recommend_weight")
+
+	// Validate sort field to prevent SQL injection
+	if !allowedSortFields[sortBy] {
+		sortBy = "recommend_weight"
+	}
+
+	// Clamp pagination
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 {
+		size = 20
+	}
+	if size > 100 {
+		size = 100
+	}
 
 	result, err := h.topicSvc.List(c.Request.Context(), page, size, sortBy)
 	if err != nil {
@@ -54,14 +78,14 @@ func (h *TopicHandler) ListTopics(c *gin.Context) {
 func (h *TopicHandler) CreateTopic(c *gin.Context) {
 	var req service.CreateTopicRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.BadRequest(c, "请求参数错误: "+err.Error())
+		api.HandleBindError(c, err)
 		return
 	}
 
 	topic, err := h.topicSvc.Create(c.Request.Context(), req)
 	if err != nil {
-		if isKeywordDuplicate(err) {
-			api.BadRequest(c, "关键词已存在")
+		if errors.Is(err, service.ErrConflict) || isKeywordDuplicate(err) {
+			api.Conflict(c, "关键词已存在")
 			return
 		}
 		api.InternalError(c, "创建选题失败")
@@ -102,7 +126,7 @@ func (h *TopicHandler) UpdateTopic(c *gin.Context) {
 
 	var req service.UpdateTopicRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.BadRequest(c, "请求参数错误: "+err.Error())
+		api.HandleBindError(c, err)
 		return
 	}
 
@@ -112,8 +136,8 @@ func (h *TopicHandler) UpdateTopic(c *gin.Context) {
 			api.NotFound(c, "选题不存在")
 			return
 		}
-		if isKeywordDuplicate(err) {
-			api.BadRequest(c, "关键词已存在")
+		if errors.Is(err, service.ErrConflict) || isKeywordDuplicate(err) {
+			api.Conflict(c, "关键词已存在")
 			return
 		}
 		api.InternalError(c, "更新选题失败")
@@ -189,7 +213,7 @@ func (h *TopicHandler) UpdatePerformance(c *gin.Context) {
 
 	var req service.PerformanceFeedback
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.BadRequest(c, "请求参数错误: "+err.Error())
+		api.HandleBindError(c, err)
 		return
 	}
 
