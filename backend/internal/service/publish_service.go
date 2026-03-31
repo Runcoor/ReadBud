@@ -14,11 +14,12 @@ import (
 
 // PublishService handles publish job orchestration.
 type PublishService struct {
-	jobRepo    postgres.PublishJobRepository
-	recordRepo postgres.PublishRecordRepository
-	publisher  adapter.WeChatPublisher
-	tokenProv  wechat.TokenProvider
-	logger     *zap.Logger
+	jobRepo         postgres.PublishJobRepository
+	recordRepo      postgres.PublishRecordRepository
+	publisher       adapter.WeChatPublisher
+	tokenProv       wechat.TokenProvider
+	contentImageSvc *ContentImageService
+	logger          *zap.Logger
 }
 
 // NewPublishService creates a new PublishService.
@@ -27,14 +28,16 @@ func NewPublishService(
 	recordRepo postgres.PublishRecordRepository,
 	publisher adapter.WeChatPublisher,
 	tokenProv wechat.TokenProvider,
+	contentImageSvc *ContentImageService,
 	logger *zap.Logger,
 ) *PublishService {
 	return &PublishService{
-		jobRepo:    jobRepo,
-		recordRepo: recordRepo,
-		publisher:  publisher,
-		tokenProv:  tokenProv,
-		logger:     logger,
+		jobRepo:         jobRepo,
+		recordRepo:      recordRepo,
+		publisher:       publisher,
+		tokenProv:       tokenProv,
+		contentImageSvc: contentImageSvc,
+		logger:          logger,
 	}
 }
 
@@ -123,10 +126,42 @@ func (s *PublishService) ProcessJob(ctx context.Context, jobID int64, appID stri
 		return s.failJob(ctx, job, fmt.Sprintf("get access token: %v", err))
 	}
 
+	// Upload content images to WeChat before HTML compilation.
+	// WeChat filters external URLs, so all images must go through their API.
+	if s.contentImageSvc != nil {
+		uploadResults, err := s.contentImageSvc.UploadForDraft(ctx, job.DraftID, appID)
+		if err != nil {
+			s.logger.Warn("content image upload had errors, proceeding with available images",
+				zap.Int64("draft_id", job.DraftID),
+				zap.Error(err),
+			)
+		}
+		if len(uploadResults) > 0 {
+			s.logger.Info("content images uploaded for draft",
+				zap.Int64("draft_id", job.DraftID),
+				zap.Int("count", len(uploadResults)),
+			)
+		}
+	}
+
 	article := adapter.WeChatArticle{
 		Title:   fmt.Sprintf("Draft %d", job.DraftID),
 		Content: "<p>Stub content for publish pipeline</p>",
 	}
+
+	// Replace image URLs in HTML with WeChat URLs
+	if s.contentImageSvc != nil {
+		replaced, err := s.contentImageSvc.ReplaceImageURLsInHTML(ctx, article.Content, job.DraftID)
+		if err != nil {
+			s.logger.Warn("failed to replace image URLs in HTML",
+				zap.Int64("draft_id", job.DraftID),
+				zap.Error(err),
+			)
+		} else {
+			article.Content = replaced
+		}
+	}
+
 	mediaID, err := s.publisher.CreateDraft(ctx, token, article)
 	if err != nil {
 		return s.failJob(ctx, job, fmt.Sprintf("create draft: %v", err))

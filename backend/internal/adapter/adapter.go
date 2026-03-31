@@ -162,6 +162,16 @@ type WeChatArticle struct {
 	SourceURL  string `json:"source_url"`  // "Read original" link
 }
 
+// Content image upload constraints per WeChat API specification.
+const (
+	// ContentImageMaxBytes is the maximum size for a single content image (1 MB).
+	ContentImageMaxBytes = 1 * 1024 * 1024
+	// ContentImageMIMEJPEG is the MIME type for JPEG images.
+	ContentImageMIMEJPEG = "image/jpeg"
+	// ContentImageMIMEPNG is the MIME type for PNG images.
+	ContentImageMIMEPNG = "image/png"
+)
+
 // WeChatPublishResult contains the result of a WeChat publish operation.
 type WeChatPublishResult struct {
 	MediaID   string `json:"media_id"`
@@ -171,8 +181,13 @@ type WeChatPublishResult struct {
 
 // WeChatPublisher abstracts WeChat Official Account article publishing.
 type WeChatPublisher interface {
-	// UploadImage uploads an image to WeChat and returns media_id.
+	// UploadImage uploads an image to WeChat as permanent material and returns media_id.
 	UploadImage(ctx context.Context, accessToken string, imageData []byte, filename string) (string, error)
+	// UploadContentImage uploads an in-article image (正文图片) to WeChat.
+	// Unlike UploadImage, this returns a WeChat-accessible URL (not a media_id)
+	// and does NOT consume the permanent material quota.
+	// Only jpg/png allowed, max 1MB per image.
+	UploadContentImage(ctx context.Context, accessToken string, imageData []byte, filename string) (string, error)
 	// CreateDraft creates a draft article on WeChat.
 	CreateDraft(ctx context.Context, accessToken string, article WeChatArticle) (string, error)
 	// Publish publishes a draft article.

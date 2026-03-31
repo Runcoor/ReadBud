@@ -39,6 +39,29 @@ func (p *StubWeChatPublisher) UploadImage(ctx context.Context, accessToken strin
 	return mediaID, nil
 }
 
+// UploadContentImage uploads an in-article image and returns a stub WeChat URL.
+// In production this calls the WeChat content image upload API which returns
+// a URL rather than a media_id (separate from permanent materials).
+func (p *StubWeChatPublisher) UploadContentImage(ctx context.Context, accessToken string, imageData []byte, filename string) (string, error) {
+	if accessToken == "" {
+		return "", fmt.Errorf("StubWeChatPublisher.UploadContentImage: access token is required")
+	}
+	if len(imageData) == 0 {
+		return "", fmt.Errorf("StubWeChatPublisher.UploadContentImage: image data is empty")
+	}
+	if len(imageData) > adapter.ContentImageMaxBytes {
+		return "", fmt.Errorf("StubWeChatPublisher.UploadContentImage: image exceeds 1MB limit (%d bytes)", len(imageData))
+	}
+
+	wechatURL := fmt.Sprintf("https://mmbiz.qpic.cn/stub/%s_%d.png", filename, time.Now().UnixMilli())
+	p.logger.Info("stub: uploaded content image to WeChat",
+		zap.String("filename", filename),
+		zap.Int("size_bytes", len(imageData)),
+		zap.String("wechat_url", wechatURL),
+	)
+	return wechatURL, nil
+}
+
 // CreateDraft creates a draft article on WeChat and returns a stub media_id.
 func (p *StubWeChatPublisher) CreateDraft(ctx context.Context, accessToken string, article adapter.WeChatArticle) (string, error) {
 	if accessToken == "" {
