@@ -1,7 +1,7 @@
 <template>
   <div class="overview-report">
     <!-- Header -->
-    <header class="report-header">
+    <header class="mono-header">
       <div class="header-left">
         <el-button text :icon="ArrowLeft" @click="router.push({ name: 'Workbench' })">
           返回工作台
@@ -43,7 +43,7 @@
           <div
             v-for="kpi in report.kpis.value"
             :key="kpi.key"
-            class="kpi-card"
+            class="mono-kpi-card"
           >
             <div class="kpi-label">{{ kpi.label }}</div>
             <div class="kpi-value">
@@ -66,7 +66,7 @@
           <div
             v-for="dim in report.dimensions.value"
             :key="dim.label"
-            class="analysis-card"
+            class="mono-analysis-card"
           >
             <div class="analysis-card-header">
               <h3 class="analysis-card-title">{{ dim.label }}</h3>
@@ -85,8 +85,7 @@
                       class="bar-fill"
                       :style="{
                         width: dim.values[idx] + '%',
-                        backgroundColor: dim.color,
-                        opacity: 0.6 + (dim.values[idx] / 100) * 0.4,
+                        opacity: 0.4 + (dim.values[idx] / 100) * 0.6,
                       }"
                     />
                   </div>
@@ -102,14 +101,14 @@
       <section class="topics-section">
         <div class="section-header">
           <h2 class="section-title">选题推荐</h2>
-          <el-button text type="primary" @click="router.push({ name: 'Workbench' })">
+          <el-button text @click="router.push({ name: 'Workbench' })">
             返回工作台使用 →
           </el-button>
         </div>
 
         <!-- Empty State -->
-        <div v-if="report.recommendations.value.length === 0" class="empty-state">
-          <el-icon :size="48" color="#D1D5DB"><DataLine /></el-icon>
+        <div v-if="report.recommendations.value.length === 0" class="mono-empty-state">
+          <el-icon :size="48" style="color: var(--border-medium)"><DataLine /></el-icon>
           <p class="empty-title">暂无选题数据</p>
           <p class="empty-desc">使用关键词创建内容任务后，系统会自动积累选题推荐</p>
         </div>
@@ -119,7 +118,7 @@
           <div
             v-for="topic in report.recommendations.value"
             :key="topic.public_id"
-            class="topic-card"
+            class="mono-topic-card"
           >
             <div class="topic-keyword">{{ topic.keyword }}</div>
             <div class="topic-meta">
@@ -179,24 +178,23 @@ function formatDateShort(dateStr: string): string {
 </script>
 
 <style lang="scss" scoped>
-@use '@/styles/_tokens.scss' as *;
+@use '@/styles/tokens' as *;
 
 .overview-report {
   min-height: 100vh;
-  background: $color-bg;
-  padding: $spacing-2xl $spacing-3xl;
-  max-width: 1440px;
+  padding: 0 48px 48px;
   margin: 0 auto;
+  background: var(--surface-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
 }
 
-// --- Header ---
-.report-header {
+.mono-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: $spacing-2xl;
-  padding-bottom: $spacing-lg;
-  border-bottom: 1px solid $color-border;
+  padding: 24px 0;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .header-center {
@@ -204,281 +202,300 @@ function formatDateShort(dateStr: string): string {
 }
 
 .page-title {
-  font-size: $font-size-2xl;
-  font-weight: $font-weight-semibold;
-  color: $color-primary;
+  font-size: 24px;
+  font-weight: 700;
   margin: 0;
-  line-height: $line-height-tight;
+  line-height: 1.2;
+  color: var(--text-primary);
 }
 
 .page-subtitle {
-  font-size: $font-size-sm;
-  color: $color-text-muted;
-  margin: $spacing-xs 0 0;
+  font-size: 13px;
+  color: var(--border-medium);
+  margin: 4px 0 0;
 }
 
-// --- Error ---
+:deep(.el-button) {
+  color: var(--text-secondary) !important;
+  &:hover {
+    color: var(--text-primary) !important;
+    background: var(--surface-tertiary) !important;
+  }
+}
+
+:deep(.el-button--primary) {
+  background: var(--text-primary) !important;
+  border-color: var(--text-primary) !important;
+  color: var(--text-inverse) !important;
+  border-radius: 8px !important;
+  &:hover { background: var(--text-primary) !important; border-color: var(--text-primary) !important; opacity: 0.85; }
+  &:active { transform: scale(0.98); }
+}
+
 .report-error {
   display: flex;
   justify-content: center;
-  padding: $spacing-4xl 0;
+  padding: 80px 0;
+
+  :deep(.el-result__title) {
+    color: var(--text-primary) !important;
+  }
+  :deep(.el-result__subtitle) {
+    color: var(--text-secondary) !important;
+  }
 }
 
-// --- Loading ---
 .report-loading {
   display: flex;
   flex-direction: column;
-  gap: $spacing-xl;
-  padding: $spacing-2xl 0;
+  gap: 28px;
+  padding: 32px 0;
 }
 
 .skeleton-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: $spacing-xl;
+  gap: 24px;
 }
 
-// --- Section ---
+:deep(.el-skeleton) {
+  --el-skeleton-color: var(--surface-tertiary);
+  --el-skeleton-to-color: var(--border-light);
+}
+
 .section-title {
-  font-size: $font-size-lg;
-  font-weight: $font-weight-semibold;
-  color: $color-text-primary;
-  margin: 0 0 $spacing-lg;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 20px;
 }
 
 .section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: $spacing-lg;
+  margin-bottom: 20px;
 
   .section-title {
     margin-bottom: 0;
   }
 }
 
-// --- KPI Cards ---
+// KPI Cards
 .kpi-section {
-  margin-bottom: $spacing-3xl;
+  margin-bottom: 40px;
 }
 
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: $spacing-lg;
+  gap: 20px;
 }
 
-.kpi-card {
-  background: $color-card-bg;
-  border-radius: $radius-lg;
-  padding: $spacing-xl $spacing-lg;
-  box-shadow: $shadow-card;
-  transition: box-shadow $transition-base;
-
+.mono-kpi-card,
+.mono-analysis-card,
+.mono-topic-card {
+  @include glass-panel;
+  padding: 24px;
+  transition: all 150ms ease;
   &:hover {
-    box-shadow: $shadow-card-hover;
+    box-shadow: var(--shadow-lg);
   }
 }
 
+.mono-kpi-card {
+  padding: 24px 20px;
+}
+
 .kpi-label {
-  font-size: $font-size-sm;
-  color: $color-text-muted;
-  margin-bottom: $spacing-sm;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
 }
 
 .kpi-value {
   display: flex;
   align-items: baseline;
-  gap: $spacing-xs;
+  gap: 4px;
 }
 
 .kpi-number {
-  font-size: $font-size-3xl;
-  font-weight: $font-weight-bold;
-  color: $color-text-primary;
-  line-height: $line-height-tight;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
 }
 
 .kpi-unit {
-  font-size: $font-size-sm;
-  color: $color-text-muted;
+  font-size: 13px;
+  color: var(--border-medium);
 }
 
 .kpi-trend {
   display: flex;
   align-items: center;
   gap: 2px;
-  margin-top: $spacing-sm;
-  font-size: $font-size-xs;
+  margin-top: 8px;
+  font-size: 12px;
 
   &.trend-up {
-    color: $color-success;
+    color: #22c55e;
   }
 
   &.trend-down {
-    color: $color-error;
+    color: #ef4444;
   }
 
   &.trend-flat {
-    color: $color-text-muted;
+    color: var(--border-medium);
   }
 }
 
-// --- Analysis Cards ---
+// Analysis Cards
 .analysis-section {
-  margin-bottom: $spacing-3xl;
+  margin-bottom: 40px;
 }
 
 .analysis-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: $spacing-lg;
-}
-
-.analysis-card {
-  background: $color-card-bg;
-  border-radius: $radius-lg;
-  padding: $spacing-xl;
-  box-shadow: $shadow-card;
+  gap: 20px;
 }
 
 .analysis-card-header {
   display: flex;
   align-items: baseline;
-  gap: $spacing-sm;
-  margin-bottom: $spacing-lg;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
 .analysis-card-title {
-  font-size: $font-size-md;
-  font-weight: $font-weight-semibold;
-  color: $color-text-primary;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .analysis-card-desc {
-  font-size: $font-size-xs;
-  color: $color-text-muted;
+  font-size: 12px;
+  color: var(--border-medium);
 }
 
-// --- Bar Chart (inline) ---
+// Bar Chart
 .bar-chart {
   display: flex;
   flex-direction: column;
-  gap: $spacing-md;
+  gap: 14px;
 }
 
 .bar-row {
   display: flex;
   align-items: center;
-  gap: $spacing-md;
+  gap: 12px;
 }
 
 .bar-label {
   flex: 0 0 72px;
-  font-size: $font-size-sm;
-  color: $color-text-secondary;
+  font-size: 13px;
+  color: var(--text-secondary);
   text-align: right;
 }
 
 .bar-track {
   flex: 1;
   height: 20px;
-  background: $color-bg;
-  border-radius: $radius-sm;
+  background: var(--surface-tertiary);
+  border-radius: 6px;
   overflow: hidden;
 }
 
 .bar-fill {
   height: 100%;
-  border-radius: $radius-sm;
-  transition: width $transition-slow;
+  border-radius: 6px;
+  background-color: var(--text-primary);
+  transition: width 0.6s ease;
 }
 
 .bar-value {
   flex: 0 0 32px;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  color: $color-text-primary;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
   text-align: right;
 }
 
-// --- Topics Section ---
+// Topics Section
 .topics-section {
-  margin-bottom: $spacing-2xl;
+  margin-bottom: 32px;
 }
 
-.empty-state {
+.mono-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: $spacing-4xl $spacing-xl;
-  background: $color-card-bg;
-  border-radius: $radius-lg;
-  box-shadow: $shadow-card;
+  padding: 64px 24px;
+  background: var(--surface-bg);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
 }
 
 .empty-title {
-  font-size: $font-size-md;
-  font-weight: $font-weight-medium;
-  color: $color-text-secondary;
-  margin: $spacing-lg 0 $spacing-xs;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 20px 0 6px;
 }
 
 .empty-desc {
-  font-size: $font-size-sm;
-  color: $color-text-muted;
+  font-size: 13px;
+  color: var(--border-medium);
   margin: 0;
 }
 
 .topics-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: $spacing-lg;
+  gap: 20px;
 }
 
-.topic-card {
-  background: $color-card-bg;
-  border-radius: $radius-lg;
-  padding: $spacing-lg;
-  box-shadow: $shadow-card;
-  transition: box-shadow $transition-base;
+.mono-topic-card {
+  padding: 20px;
   cursor: default;
 
   &:hover {
-    box-shadow: $shadow-card-hover;
+    border-color: var(--text-primary);
   }
 }
 
 .topic-keyword {
-  font-size: $font-size-md;
-  font-weight: $font-weight-semibold;
-  color: $color-primary;
-  margin-bottom: $spacing-sm;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 10px;
 }
 
 .topic-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: $spacing-xs;
-  margin-bottom: $spacing-md;
+  gap: 6px;
+  margin-bottom: 14px;
 }
 
 .topic-audience,
 .topic-goal {
   display: inline-block;
-  padding: 2px $spacing-sm;
-  background: $color-bg;
-  border-radius: $radius-sm;
-  font-size: $font-size-xs;
-  color: $color-text-secondary;
+  padding: 2px 10px;
+  background: var(--surface-tertiary);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .topic-scores {
   display: flex;
-  gap: $spacing-lg;
-  margin-bottom: $spacing-sm;
+  gap: 20px;
+  margin-bottom: 8px;
 }
 
 .score-item {
@@ -487,25 +504,24 @@ function formatDateShort(dateStr: string): string {
 }
 
 .score-label {
-  font-size: $font-size-xs;
-  color: $color-text-muted;
+  font-size: 11px;
+  color: var(--border-medium);
 }
 
 .score-value {
-  font-size: $font-size-lg;
-  font-weight: $font-weight-semibold;
-  color: $color-text-primary;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .topic-used {
-  font-size: $font-size-xs;
-  color: $color-text-muted;
+  font-size: 11px;
+  color: var(--border-medium);
 }
 
-// --- Responsive: 1024px ---
-@media (max-width: $breakpoint-md) {
+@media (max-width: 1024px) {
   .overview-report {
-    padding: $spacing-xl $spacing-lg;
+    padding: 0 24px 32px;
   }
 
   .kpi-grid {
@@ -521,15 +537,15 @@ function formatDateShort(dateStr: string): string {
   }
 }
 
-// --- Responsive: 768px ---
-@media (max-width: $breakpoint-sm) {
+@media (max-width: 768px) {
   .overview-report {
-    padding: $spacing-lg $spacing-base;
+    padding: 0 16px 24px;
   }
 
-  .report-header {
+  .mono-header {
     flex-direction: column;
-    gap: $spacing-md;
+    gap: 12px;
+    padding: 16px 0;
   }
 
   .kpi-grid {
@@ -537,7 +553,7 @@ function formatDateShort(dateStr: string): string {
   }
 
   .kpi-number {
-    font-size: $font-size-xl;
+    font-size: 22px;
   }
 
   .topics-grid {
@@ -546,7 +562,7 @@ function formatDateShort(dateStr: string): string {
 
   .bar-label {
     flex: 0 0 56px;
-    font-size: $font-size-xs;
+    font-size: 12px;
   }
 }
 </style>
