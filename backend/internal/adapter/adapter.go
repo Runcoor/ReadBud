@@ -179,6 +179,35 @@ type WeChatPublishResult struct {
 	PublishID string `json:"publish_id"`
 }
 
+// ---------- WeChat Metrics Sync Provider ----------
+
+// ArticleMetrics represents metrics data for a single article from WeChat analytics API.
+type ArticleMetrics struct {
+	ArticleID      string `json:"article_id"`
+	ReadCount      int    `json:"read_count"`
+	ReadUserCount  int    `json:"read_user_count"`
+	ShareCount     int    `json:"share_count"`
+	ShareUserCount int    `json:"share_user_count"`
+	RawJSON        []byte `json:"raw_json,omitempty"` // Original API response
+}
+
+// FansMetrics represents fan growth data from WeChat analytics API.
+type FansMetrics struct {
+	Date            string `json:"date"` // YYYY-MM-DD
+	AddFansCount    int    `json:"add_fans_count"`
+	CancelFansCount int    `json:"cancel_fans_count"`
+	NetFansCount    int    `json:"net_fans_count"`
+	RawJSON         []byte `json:"raw_json,omitempty"`
+}
+
+// MetricsSyncProvider abstracts WeChat data analytics APIs for syncing article metrics.
+type MetricsSyncProvider interface {
+	// GetArticleMetrics fetches read/share metrics for a published article.
+	GetArticleMetrics(ctx context.Context, accessToken string, articleID string) (*ArticleMetrics, error)
+	// GetFansMetrics fetches fan growth data for a date range.
+	GetFansMetrics(ctx context.Context, accessToken string, date string) (*FansMetrics, error)
+}
+
 // WeChatPublisher abstracts WeChat Official Account article publishing.
 type WeChatPublisher interface {
 	// UploadImage uploads an image to WeChat as permanent material and returns media_id.

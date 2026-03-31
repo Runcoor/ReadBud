@@ -111,10 +111,14 @@ func main() {
 		publishRecordRepo := postgres.NewPublishRecordRepository(db)
 		assetRepo := postgres.NewAssetRepository(db)
 
+		// Metrics repository
+		metricsRepo := postgres.NewMetricsSnapshotRepository(db)
+
 		// Stub adapters for development
 		stubPublisher := wechat.NewStubWeChatPublisher(logger.L)
 		stubTokenProv := wechat.NewStubTokenProvider()
 		stubStorage := storage.NewStubStorageProvider(logger.L)
+		stubMetricsSync := wechat.NewStubMetricsSyncProvider(logger.L)
 
 		// Services
 		authSvc := service.NewAuthService(userRepo, jwtCfg)
@@ -124,6 +128,7 @@ func main() {
 		draftSvc := service.NewDraftService(draftRepo, blockRepo, sourceRepo, taskRepo)
 		contentImageSvc := service.NewContentImageService(assetRepo, stubPublisher, stubStorage, stubTokenProv, logger.L)
 		publishSvc := service.NewPublishService(publishJobRepo, publishRecordRepo, stubPublisher, stubTokenProv, contentImageSvc, logger.L)
+		metricsSvc := service.NewMetricsService(metricsRepo, publishRecordRepo, stubMetricsSync, stubTokenProv, logger.L)
 
 		// Handlers
 		authHandler := apiHTTP.NewAuthHandler(authSvc)
@@ -133,6 +138,7 @@ func main() {
 		draftHandler := apiHTTP.NewDraftHandler(draftSvc)
 		sourceHandler := apiHTTP.NewSourceHandler(draftSvc)
 		publishHandler := apiHTTP.NewPublishHandler(publishSvc, draftRepo, wechatRepo)
+		metricsHandler := apiHTTP.NewMetricsHandler(metricsSvc, wechatRepo)
 
 		// Public routes (no auth required)
 		authHandler.RegisterRoutes(v1)
@@ -147,6 +153,7 @@ func main() {
 			taskHandler.RegisterRoutes(protected)
 			draftHandler.RegisterRoutes(protected)
 			publishHandler.RegisterRoutes(protected)
+			metricsHandler.RegisterRoutes(protected)
 			protected.GET("/tasks/:id/events", sseHub.ServeHTTP("id"))
 			protected.GET("/tasks/:id/sources", sourceHandler.GetTaskSources)
 		}

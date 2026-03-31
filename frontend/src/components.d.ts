@@ -38,6 +38,7 @@ declare module 'vue' {
     ElTabPane: typeof import('element-plus/es')['ElTabPane']
     ElTabs: typeof import('element-plus/es')['ElTabs']
     ElTag: typeof import('element-plus/es')['ElTag']
+    MetricsPanel: typeof import('./components/task/MetricsPanel.vue')['default']
     PublishPanel: typeof import('./components/task/PublishPanel.vue')['default']
     PublishStatusCard: typeof import('./components/task/PublishStatusCard.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
