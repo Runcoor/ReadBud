@@ -34,12 +34,32 @@ type GenerateDistributionRequest struct {
 }
 
 // distributionLLMOutput is the structured output expected from the LLM.
+// NextTopicSuggestion uses json.RawMessage because LLM may return a string or array.
 type distributionLLMOutput struct {
-	CommunityCopy       string `json:"community_copy"`
-	MomentsCopy         string `json:"moments_copy"`
-	SummaryCard         string `json:"summary_card"`
-	CommentGuide        string `json:"comment_guide"`
-	NextTopicSuggestion string `json:"next_topic_suggestion"`
+	CommunityCopy       string          `json:"community_copy"`
+	MomentsCopy         string          `json:"moments_copy"`
+	SummaryCard         string          `json:"summary_card"`
+	CommentGuide        string          `json:"comment_guide"`
+	NextTopicSuggestion json.RawMessage `json:"next_topic_suggestion"`
+}
+
+// nextTopicAsString normalises the LLM output to a single string.
+func (o *distributionLLMOutput) nextTopicAsString() string {
+	if len(o.NextTopicSuggestion) == 0 {
+		return ""
+	}
+	// Try string first
+	var s string
+	if json.Unmarshal(o.NextTopicSuggestion, &s) == nil {
+		return s
+	}
+	// Try array of strings
+	var arr []string
+	if json.Unmarshal(o.NextTopicSuggestion, &arr) == nil {
+		return strings.Join(arr, "\n")
+	}
+	// Fallback: raw text
+	return string(o.NextTopicSuggestion)
 }
 
 // DistributionService handles distribution package generation and retrieval.
@@ -100,7 +120,7 @@ func (s *DistributionService) Generate(ctx context.Context, draftPublicID string
 		MomentsCopy:         output.MomentsCopy,
 		SummaryCard:         output.SummaryCard,
 		CommentGuide:        output.CommentGuide,
-		NextTopicSuggestion: output.NextTopicSuggestion,
+		NextTopicSuggestion: output.nextTopicAsString(),
 	}
 
 	if err := s.distRepo.Upsert(ctx, pkg); err != nil {

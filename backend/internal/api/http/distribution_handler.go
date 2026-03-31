@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+	"log"
 
 	"github.com/gin-gonic/gin"
 
@@ -44,6 +45,7 @@ func (h *DistributionHandler) Generate(c *gin.Context) {
 			api.NotFound(c, "草稿不存在")
 			return
 		}
+		log.Printf("[distribution] generate failed: %v", err)
 		api.InternalError(c, "生成分发素材包失败")
 		return
 	}
