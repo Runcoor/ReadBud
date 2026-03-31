@@ -2,14 +2,21 @@
 
 export type TaskStatus =
   | 'pending'
-  | 'collecting'
-  | 'analyzing'
-  | 'writing'
-  | 'asseting'
-  | 'review_ready'
-  | 'publishing'
-  | 'published'
+  | 'running'
+  | 'done'
   | 'failed'
+
+export type TaskStage =
+  | 'keyword_expand'
+  | 'source_search'
+  | 'content_crawl'
+  | 'hot_score'
+  | 'article_write'
+  | 'image_match'
+  | 'chart_gen'
+  | 'html_compile'
+  | 'review'
+  | 'publish'
 
 export type ImageMode = 'auto' | 'search_only' | 'generate_only'
 
@@ -17,14 +24,14 @@ export type PublishMode = 'manual' | 'now' | 'schedule'
 
 export interface CreateTaskRequest {
   keyword: string
-  audience: string
-  tone: string
-  target_words: number
+  audience?: string
+  tone?: string
+  target_words?: number
   image_mode: ImageMode
-  chart_mode: boolean
+  chart_mode?: number
   publish_mode: PublishMode
   publish_at?: string
-  wechat_account_id: string
+  wechat_account_id?: string
 }
 
 export interface TaskVO {
@@ -35,7 +42,7 @@ export interface TaskVO {
   tone: string
   target_words: number
   image_mode: ImageMode
-  chart_mode: boolean
+  chart_mode: number
   publish_mode: PublishMode
   publish_at?: string
   status: TaskStatus
@@ -47,15 +54,59 @@ export interface TaskVO {
   updated_at: string
 }
 
-export const TASK_STAGES = [
-  { key: 'collecting', label: '采集' },
-  { key: 'dedup', label: '去重' },
-  { key: 'analyzing', label: '爆文分析' },
-  { key: 'outlining', label: '文章提纲' },
-  { key: 'writing', label: '正文生成' },
-  { key: 'image_matching', label: '图片匹配' },
-  { key: 'chart_gen', label: '图表生成' },
-  { key: 'html_compile', label: 'HTML编译' },
-  { key: 'review', label: '审核检查' },
-  { key: 'publishing', label: '发布' },
+export interface TaskListResponse {
+  items: TaskVO[]
+  total: number
+  page: number
+  page_size: number
+}
+
+/** Pipeline stage definitions for UI rendering */
+export interface StageDefinition {
+  key: TaskStage
+  label: string
+  icon: string
+}
+
+export const TASK_STAGES: StageDefinition[] = [
+  { key: 'keyword_expand', label: '关键词扩展', icon: 'Search' },
+  { key: 'source_search', label: '素材搜索', icon: 'Collection' },
+  { key: 'content_crawl', label: '内容采集', icon: 'Download' },
+  { key: 'hot_score', label: '热度评分', icon: 'TrendCharts' },
+  { key: 'article_write', label: '文章撰写', icon: 'Edit' },
+  { key: 'image_match', label: '图片匹配', icon: 'Picture' },
+  { key: 'chart_gen', label: '图表生成', icon: 'DataLine' },
+  { key: 'html_compile', label: 'HTML编译', icon: 'Document' },
+  { key: 'review', label: '审核检查', icon: 'CircleCheck' },
+  { key: 'publish', label: '发布', icon: 'Promotion' },
 ] as const
+
+/** Status display label map */
+export const STATUS_LABELS: Record<TaskStatus, string> = {
+  pending: '排队中',
+  running: '执行中',
+  done: '已完成',
+  failed: '失败',
+}
+
+/** Status tag type for Element Plus */
+export const STATUS_TAG_TYPES: Record<TaskStatus, '' | 'success' | 'warning' | 'danger' | 'info'> = {
+  pending: 'info',
+  running: '',
+  done: 'success',
+  failed: 'danger',
+}
+
+/** Image mode labels */
+export const IMAGE_MODE_LABELS: Record<ImageMode, string> = {
+  auto: '自动（搜索优先）',
+  search_only: '仅搜索',
+  generate_only: '仅生成',
+}
+
+/** Publish mode labels */
+export const PUBLISH_MODE_LABELS: Record<PublishMode, string> = {
+  manual: '手动发布',
+  now: '立即发布',
+  schedule: '定时发布',
+}

@@ -44,18 +44,24 @@ const (
 	StatusFailed      = "failed"
 )
 
-// Task stage constants (10 pipeline stages).
+// Task status: running is used during active pipeline execution.
+const StatusRunning = "running"
+
+// Task status: done marks a completed task.
+const StatusDone = "done"
+
+// Task stage constants (pipeline stages).
 const (
-	StageCollecting    = "collecting"
-	StageDedup         = "dedup"
-	StageAnalyzing     = "analyzing"
-	StageOutlining     = "outlining"
-	StageWriting       = "writing"
-	StageImageMatching = "image_matching"
+	StageKeywordExpand = "keyword_expand"
+	StageSourceSearch  = "source_search"
+	StageContentCrawl  = "content_crawl"
+	StageHotScore      = "hot_score"
+	StageArticleWrite  = "article_write"
+	StageImageMatch    = "image_match"
 	StageChartGen      = "chart_gen"
 	StageHTMLCompile   = "html_compile"
 	StageReview        = "review"
-	StagePublishing    = "publishing"
+	StagePublish       = "publish"
 )
 
 // Image mode constants.

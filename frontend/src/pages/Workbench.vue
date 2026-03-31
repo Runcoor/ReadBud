@@ -19,8 +19,11 @@
           <h2 class="panel-title">任务配置</h2>
         </div>
         <div class="panel-body">
-          <!-- TaskForm component will go here (HY-295) -->
-          <el-empty description="任务表单待实现" :image-size="80" />
+          <TaskForm
+            :disabled="taskStore.isRunning"
+            :submitting="taskStore.creating"
+            @submit="handleCreateTask"
+          />
         </div>
       </aside>
 
@@ -29,8 +32,10 @@
           <h2 class="panel-title">执行流程</h2>
         </div>
         <div class="panel-body">
-          <!-- TaskProgress component will go here (HY-296) -->
-          <el-empty description="执行流程待实现" :image-size="80" />
+          <TaskProgress
+            :task="taskStore.currentTask"
+            @retry="handleRetry"
+          />
         </div>
       </section>
 
@@ -48,12 +53,36 @@
 </template>
 
 <script setup lang="ts">
+import { onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { ElMessageBox } from 'element-plus'
+import { useTaskStore } from '@/stores/task'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import TaskForm from '@/components/task/TaskForm.vue'
+import TaskProgress from '@/components/task/TaskProgress.vue'
+import type { CreateTaskRequest } from '@/types/task'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const taskStore = useTaskStore()
+
+async function handleCreateTask(payload: CreateTaskRequest): Promise<void> {
+  try {
+    await taskStore.create(payload)
+    ElMessage.success('任务已创建，正在执行...')
+  } catch {
+    // Error handled by request interceptor
+  }
+}
+
+async function handleRetry(taskId: string): Promise<void> {
+  try {
+    await taskStore.retry(taskId)
+    ElMessage.success('任务已重新提交')
+  } catch {
+    // Error handled by request interceptor
+  }
+}
 
 async function handleLogout() {
   try {
@@ -68,6 +97,10 @@ async function handleLogout() {
     // User cancelled
   }
 }
+
+onUnmounted(() => {
+  taskStore.disconnectSSE()
+})
 </script>
 
 <style lang="scss" scoped>

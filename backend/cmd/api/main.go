@@ -12,6 +12,7 @@ import (
 	"readbud/internal/pkg/crypto"
 	"readbud/internal/pkg/database"
 	"readbud/internal/pkg/logger"
+	"readbud/internal/pkg/sse"
 	"readbud/internal/repository/postgres"
 	"readbud/internal/service"
 
@@ -89,22 +90,28 @@ func main() {
 	// Encryption key for secrets (derived from JWT secret)
 	encSecret := viper.GetString("jwt.secret")
 
+	// SSE hub for real-time task progress
+	sseHub := sse.NewHub()
+
 	// Wire up services and handlers
 	if db != nil {
 		// Repositories
 		userRepo := postgres.NewUserRepository(db)
 		providerRepo := postgres.NewProviderConfigRepository(db)
 		wechatRepo := postgres.NewWechatAccountRepository(db)
+		taskRepo := postgres.NewTaskRepository(db)
 
 		// Services
 		authSvc := service.NewAuthService(userRepo, jwtCfg)
 		providerSvc := service.NewProviderConfigService(providerRepo, encSecret)
 		wechatSvc := service.NewWechatAccountService(wechatRepo, encSecret)
+		taskSvc := service.NewTaskService(taskRepo, sseHub)
 
 		// Handlers
 		authHandler := apiHTTP.NewAuthHandler(authSvc)
 		providerHandler := apiHTTP.NewProviderHandler(providerSvc)
 		wechatHandler := apiHTTP.NewWechatHandler(wechatSvc)
+		taskHandler := apiHTTP.NewTaskHandler(taskSvc)
 
 		// Public routes (no auth required)
 		authHandler.RegisterRoutes(v1)
@@ -116,6 +123,8 @@ func main() {
 			protected.POST("/auth/refresh", authHandler.RefreshToken)
 			providerHandler.RegisterRoutes(protected)
 			wechatHandler.RegisterRoutes(protected)
+			taskHandler.RegisterRoutes(protected)
+			protected.GET("/tasks/:id/events", sseHub.ServeHTTP("id"))
 		}
 	} else {
 		// Fallback when DB is unavailable
