@@ -46,9 +46,9 @@ func (c providerConfigJSON) getFormat() string {
 	return c.APIFormat
 }
 
-// parseAPIKey extracts an API key from a decrypted secret string.
+// ParseAPIKey extracts an API key from a decrypted secret string.
 // Supports both JSON format ({"api_key": "sk-xxx"}) and plain string format.
-func parseAPIKey(secret string) string {
+func ParseAPIKey(secret string) string {
 	if secret == "" {
 		return ""
 	}
@@ -82,7 +82,7 @@ func (f *ProviderFactory) ResolveLLM(ctx context.Context) (adapter.LLMProvider, 
 		return nil, fmt.Errorf("providerFactory.ResolveLLM: decrypt secret: %w", err)
 	}
 
-	apiKey := parseAPIKey(secret)
+	apiKey := ParseAPIKey(secret)
 
 	format := config.getFormat()
 	if format == "" {
@@ -134,7 +134,7 @@ func (f *ProviderFactory) ResolveImageGen(ctx context.Context) (adapter.ImageGen
 		return nil, fmt.Errorf("providerFactory.ResolveImageGen: decrypt secret: %w", err)
 	}
 
-	apiKey := parseAPIKey(secret)
+	apiKey := ParseAPIKey(secret)
 
 	format := config.Format
 	if format == "" {

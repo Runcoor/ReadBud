@@ -10,21 +10,22 @@ import (
 
 // Task type constants for the content pipeline stages.
 const (
-	TypeKeywordExpand  = "pipeline:keyword_expand"
-	TypeSourceSearch   = "pipeline:source_search"
-	TypeContentCrawl   = "pipeline:content_crawl"
-	TypeHotScore       = "pipeline:hot_score"
-	TypeArticleWrite   = "pipeline:article_write"
-	TypeImageMatch     = "pipeline:image_match"
-	TypeChartGen       = "pipeline:chart_gen"
-	TypeHTMLCompile    = "pipeline:html_compile"
-	TypePublish        = "pipeline:publish"
+	TypeKeywordExpand = "pipeline:keyword_expand"
+	TypeSourceSearch  = "pipeline:source_search"
+	TypeContentCrawl  = "pipeline:content_crawl"
+	TypeHotScore      = "pipeline:hot_score"
+	TypeArticleWrite  = "pipeline:article_write"
+	TypeImageMatch    = "pipeline:image_match"
+	TypeChartGen      = "pipeline:chart_gen"
+	TypeHTMLCompile   = "pipeline:html_compile"
+	TypePublish       = "pipeline:publish"
 )
 
-// PipelinePayload carries the task ID through all pipeline stages.
+// PipelinePayload carries data through all pipeline stages.
 type PipelinePayload struct {
-	TaskID   int64  `json:"task_id"`
-	PublicID string `json:"public_id"`
+	TaskID   int64    `json:"task_id"`
+	PublicID string   `json:"public_id"`
+	Queries  []string `json:"queries,omitempty"` // From keyword expand
 }
 
 // NewPipelineTask creates an Asynq task for the given pipeline stage.

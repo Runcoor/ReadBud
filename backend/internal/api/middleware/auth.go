@@ -21,22 +21,26 @@ const (
 // JWTAuth creates a Gin middleware that validates JWT tokens.
 func JWTAuth(jwtConfig crypto.JWTConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var tokenStr string
+
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		if authHeader != "" {
+			// Extract "Bearer <token>"
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
+				apiPkg.Unauthorized(c, "认证令牌格式错误")
+				c.Abort()
+				return
+			}
+			tokenStr = parts[1]
+		} else if t := c.Query("token"); t != "" {
+			// Fallback: support token via query param (for SSE/EventSource)
+			tokenStr = t
+		} else {
 			apiPkg.Unauthorized(c, "缺少认证令牌")
 			c.Abort()
 			return
 		}
-
-		// Extract "Bearer <token>"
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
-			apiPkg.Unauthorized(c, "认证令牌格式错误")
-			c.Abort()
-			return
-		}
-
-		tokenStr := parts[1]
 		claims, err := crypto.ParseToken(jwtConfig, tokenStr)
 		if err != nil {
 			apiPkg.Error(c, http.StatusUnauthorized, 401, "认证令牌无效或已过期")

@@ -12,6 +12,7 @@ type ProviderConfig struct {
 	ConfigJSON   datatypes.JSON `gorm:"type:jsonb" json:"config_json"`
 	SecretJSONEnc string        `gorm:"type:text" json:"-"`
 	Status       int16          `gorm:"type:smallint;not null;default:1" json:"status"`
+	IsDefault    bool           `gorm:"type:boolean;not null;default:false" json:"is_default"`
 }
 
 // TableName overrides the default table name.

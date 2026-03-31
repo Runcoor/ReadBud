@@ -13,6 +13,7 @@ import (
 
 	"readbud/internal/adapter"
 	"readbud/internal/domain/draft"
+	"readbud/internal/domain/source"
 	taskDomain "readbud/internal/domain/task"
 	"readbud/internal/pipeline"
 	"readbud/internal/repository/postgres"
@@ -22,17 +23,19 @@ import (
 
 // Server wraps the Asynq server and registers pipeline handlers.
 type Server struct {
-	srv         *asynq.Server
-	mux         *asynq.ServeMux
-	client      *asynq.Client
-	taskSvc     *service.TaskService
-	draftRepo   postgres.ArticleDraftRepository
-	blockRepo   postgres.ArticleBlockRepository
-	sourceRepo  postgres.SourceDocumentRepository
-	llmProvider adapter.LLMProvider
-	imageSearch adapter.ImageSearchProvider
-	imageGen    adapter.ImageGenProvider
-	logger      *zap.Logger
+	srv             *asynq.Server
+	mux             *asynq.ServeMux
+	client          *asynq.Client
+	taskSvc         *service.TaskService
+	draftRepo       postgres.ArticleDraftRepository
+	blockRepo       postgres.ArticleBlockRepository
+	sourceRepo      postgres.SourceDocumentRepository
+	llmProvider     adapter.LLMProvider
+	searchProvider  adapter.SearchProvider
+	crawlerProvider adapter.CrawlerProvider
+	imageSearch     adapter.ImageSearchProvider
+	imageGen        adapter.ImageGenProvider
+	logger          *zap.Logger
 }
 
 // ServerConfig holds configuration for the Asynq worker server.
@@ -51,6 +54,8 @@ func NewServer(
 	blockRepo postgres.ArticleBlockRepository,
 	sourceRepo postgres.SourceDocumentRepository,
 	llmProvider adapter.LLMProvider,
+	searchProvider adapter.SearchProvider,
+	crawlerProvider adapter.CrawlerProvider,
 	imageSearch adapter.ImageSearchProvider,
 	imageGen adapter.ImageGenProvider,
 	logger *zap.Logger,
@@ -81,17 +86,19 @@ func NewServer(
 	client := asynq.NewClient(redisOpt)
 
 	return &Server{
-		srv:         srv,
-		mux:         asynq.NewServeMux(),
-		client:      client,
-		taskSvc:     taskSvc,
-		draftRepo:   draftRepo,
-		blockRepo:   blockRepo,
-		sourceRepo:  sourceRepo,
-		llmProvider: llmProvider,
-		imageSearch: imageSearch,
-		imageGen:    imageGen,
-		logger:      logger,
+		srv:             srv,
+		mux:             asynq.NewServeMux(),
+		client:          client,
+		taskSvc:         taskSvc,
+		draftRepo:       draftRepo,
+		blockRepo:       blockRepo,
+		sourceRepo:      sourceRepo,
+		llmProvider:     llmProvider,
+		searchProvider:  searchProvider,
+		crawlerProvider: crawlerProvider,
+		imageSearch:     imageSearch,
+		imageGen:        imageGen,
+		logger:          logger,
 	}
 }
 
@@ -205,8 +212,65 @@ func (s *Server) handleSourceSearch(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	// SearchProvider is still stub — simulate source results
-	time.Sleep(1 * time.Second)
+	// Use expanded queries from previous stage (or original keyword)
+	queries := p.Queries
+	if len(queries) == 0 {
+		task, _ := s.taskSvc.GetByID(ctx, p.TaskID)
+		if task != nil {
+			queries = []string{task.Keyword}
+		}
+	}
+
+	// Search using all queries, deduplicate by URL
+	seen := make(map[string]bool)
+	var allResults []adapter.SearchResult
+	for _, q := range queries {
+		results, searchErr := s.searchProvider.Search(ctx, q, adapter.SearchOptions{MaxResults: 3})
+		if searchErr != nil {
+			s.logger.Warn("source search: query failed", zap.String("query", q), zap.Error(searchErr))
+			continue
+		}
+		for _, r := range results {
+			if !seen[r.URL] {
+				seen[r.URL] = true
+				allResults = append(allResults, r)
+			}
+		}
+	}
+
+	s.logger.Info("source search: found sources", zap.Int("count", len(allResults)))
+
+	// Save sources to DB
+	task, _ := s.taskSvc.GetByID(ctx, p.TaskID)
+	if task != nil {
+		now := time.Now()
+		for i, r := range allResults {
+			if i >= 10 {
+				break
+			}
+			src := source.SourceDocument{
+				TaskID:     task.ID,
+				SourceType: source.SourceTypeWeb,
+				SourceURL:  r.URL,
+				Title:      r.Title,
+				CrawledAt:  now,
+			}
+			if createErr := s.sourceRepo.Create(ctx, &src); createErr != nil {
+				s.logger.Warn("source search: failed to save source", zap.String("url", r.URL), zap.Error(createErr))
+			}
+		}
+	}
+
+	// Store URLs in payload for crawl stage
+	var urls []string
+	for _, r := range allResults {
+		urls = append(urls, r.URL)
+		if len(urls) >= 5 {
+			break
+		}
+	}
+	p.SourceURLs = urls
+
 	return s.enqueueNext(pipeline.TypeContentCrawl, *p)
 }
 
@@ -221,8 +285,22 @@ func (s *Server) handleContentCrawl(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	// CrawlerProvider is still stub
-	time.Sleep(1 * time.Second)
+	// Crawl each source URL
+	var crawledContents []string
+	for _, u := range p.SourceURLs {
+		page, crawlErr := s.crawlerProvider.Crawl(ctx, u)
+		if crawlErr != nil {
+			s.logger.Warn("content crawl: failed", zap.String("url", u), zap.Error(crawlErr))
+			continue
+		}
+		crawledContents = append(crawledContents, fmt.Sprintf("--- Source: %s ---\n%s", page.Title, page.Content))
+	}
+
+	s.logger.Info("content crawl: crawled", zap.Int("count", len(crawledContents)))
+
+	// Store crawled content in payload for later stages
+	p.CrawledContent = strings.Join(crawledContents, "\n\n")
+
 	return s.enqueueNext(pipeline.TypeHotScore, *p)
 }
 
@@ -237,7 +315,33 @@ func (s *Server) handleHotScore(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	if p.CrawledContent == "" {
+		s.logger.Info("hot score: no crawled content, skipping")
+		return s.enqueueNext(pipeline.TypeArticleWrite, *p)
+	}
+
+	// Use LLM to analyze and rank the crawled content
+	task, _ := s.taskSvc.GetByID(ctx, p.TaskID)
+	keyword := ""
+	if task != nil {
+		keyword = task.Keyword
+	}
+
+	scored, llmErr := s.callLLM(ctx,
+		`你是一个内容分析师。分析以下搜集到的素材，评估每段内容与主题的相关性、信息质量和独特性。
+返回一段精炼的、高质量的素材摘要（不超过2000字），只保留最有价值的信息、数据、观点和案例。
+去除重复内容、广告、无关信息。直接返回整理后的文本，不需要JSON格式。`,
+		fmt.Sprintf("主题关键词: %s\n\n搜集到的素材:\n%s", keyword, p.CrawledContent),
+		3000,
+	)
+	if llmErr != nil {
+		s.logger.Warn("hot score: LLM analysis failed, using raw content", zap.Error(llmErr))
+		// Keep raw content as-is
+	} else {
+		p.CrawledContent = scored
+	}
+
+	s.logger.Info("hot score: analysis done", zap.Int("content_len", len(p.CrawledContent)))
 	return s.enqueueNext(pipeline.TypeArticleWrite, *p)
 }
 
@@ -292,7 +396,14 @@ func (s *Server) handleArticleWrite(ctx context.Context, t *asynq.Task) error {
     {"type": "cta", "content": "<div style='background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:16px;padding:32px;color:#fff;text-align:center'><h3 style='margin:0 0 12px;font-size:20px'>结尾卡片标题</h3><p style='margin:0;opacity:0.9;font-size:15px;line-height:1.6'>具体的行动号召或思考问题</p></div>"}
   ]
 }`,
-		fmt.Sprintf("关键词: %s\n目标受众: %s\n语气风格: %s\n目标字数: %d\n\n请开始撰写。记住：写出真正有价值、有洞见、让人读完有收获的好文章，像一位行业专家在分享真知灼见，而不是AI在堆砌信息。", task.Keyword, task.Audience, task.Tone, task.TargetWords),
+		func() string {
+			userPrompt := fmt.Sprintf("关键词: %s\n目标受众: %s\n语气风格: %s\n目标字数: %d", task.Keyword, task.Audience, task.Tone, task.TargetWords)
+			if p.CrawledContent != "" {
+				userPrompt += fmt.Sprintf("\n\n以下是搜集到的高质量参考素材，请基于这些素材撰写文章（但不要照搬，要用自己的语言重新组织）：\n\n%s", p.CrawledContent)
+			}
+			userPrompt += "\n\n请开始撰写。记住：写出真正有价值、有洞见、让人读完有收获的好文章，像一位行业专家在分享真知灼见，而不是AI在堆砌信息。"
+			return userPrompt
+		}(),
 		8192,
 	)
 	if err != nil {

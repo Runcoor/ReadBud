@@ -19,6 +19,7 @@ type ProviderConfigVO struct {
 	ConfigJSON   json.RawMessage `json:"config_json"`
 	HasSecret    bool            `json:"has_secret"`
 	Status       int16           `json:"status"`
+	IsDefault    bool            `json:"is_default"`
 }
 
 // WechatAccountRequest is the DTO for creating/updating a WeChat account.

@@ -26,7 +26,6 @@ func (h *AuthHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	auth := rg.Group("/auth")
 	{
 		auth.POST("/login", h.Login)
-		auth.POST("/refresh", h.RefreshToken)
 	}
 }
 

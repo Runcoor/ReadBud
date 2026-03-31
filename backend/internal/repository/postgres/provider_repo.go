@@ -62,7 +62,7 @@ func (r *providerRepo) FindByPublicID(ctx context.Context, publicID string) (*do
 
 func (r *providerRepo) FindByType(ctx context.Context, providerType string) ([]domain.ProviderConfig, error) {
 	var configs []domain.ProviderConfig
-	if err := r.db.WithContext(ctx).Where("provider_type = ? AND status = ?", providerType, domain.StatusActive).Find(&configs).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("provider_type = ? AND status = ?", providerType, domain.StatusActive).Order("is_default DESC, id ASC").Find(&configs).Error; err != nil {
 		return nil, fmt.Errorf("providerRepo.FindByType: %w", err)
 	}
 	return configs, nil

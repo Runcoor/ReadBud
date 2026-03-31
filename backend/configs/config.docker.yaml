@@ -1,0 +1,35 @@
+server:
+  port: 19881
+  mode: release
+
+database:
+  host: postgres
+  port: 5432
+  user: readbud
+  password: readbud_secret
+  dbname: readbud
+  sslmode: disable
+  max_open_conns: 25
+  max_idle_conns: 10
+  conn_max_lifetime: 300
+
+redis:
+  addr: redis:6379
+  password: ""
+  db: 0
+
+storage:
+  provider: minio
+  endpoint: host.docker.internal:19000
+  access_key: minioadmin
+  secret_key: minioadmin
+  bucket: readbud
+  use_ssl: false
+
+jwt:
+  secret: readbud-jwt-secret-change-in-production
+  expiry: 24
+
+log:
+  level: info
+  output: stdout

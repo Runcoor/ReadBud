@@ -1,0 +1,5 @@
+.git
+*.md
+logs/
+api
+worker

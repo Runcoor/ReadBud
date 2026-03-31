@@ -14,8 +14,10 @@ import (
 
 	"readbud/internal/adapter"
 	"readbud/internal/integration"
+	crawlerInteg "readbud/internal/integration/crawler"
 	imageInteg "readbud/internal/integration/image"
 	"readbud/internal/integration/llm"
+	searchInteg "readbud/internal/integration/search"
 	"readbud/internal/pkg/database"
 	"readbud/internal/pkg/logger"
 	"readbud/internal/pkg/sse"
@@ -103,6 +105,44 @@ func main() {
 	stubImageGen := imageInteg.NewStubImageGenProvider(logger.L)
 	imageGenProvider := integration.NewLazyImageGenProvider(providerFactory, stubImageGen)
 
+	// Google Search provider — resolve from DB config with stub fallback
+	var searchProvider adapter.SearchProvider
+	searchCfg, searchCfgErr := providerSvc.GetActiveByType(context.Background(), "search")
+	if searchCfgErr == nil && searchCfg != nil {
+		searchSecret, _ := providerSvc.DecryptSecret(context.Background(), searchCfg)
+		apiKey := integration.ParseAPIKey(searchSecret)
+		var cfg struct {
+			SearchEngineID string `json:"search_engine_id"`
+		}
+		_ = json.Unmarshal(searchCfg.ConfigJSON, &cfg)
+		if apiKey != "" && cfg.SearchEngineID != "" {
+			searchProvider = searchInteg.NewGoogleSearchProvider(apiKey, cfg.SearchEngineID, logger.L)
+			logger.L.Info("search provider: Google Custom Search")
+		}
+	}
+	if searchProvider == nil {
+		searchProvider = searchInteg.NewStubSearchProvider(logger.L)
+		logger.L.Info("search provider: stub (no config)")
+	}
+
+	// Jina Reader crawler provider — resolve from DB config with stub fallback
+	var crawlerProvider adapter.CrawlerProvider
+	crawlerSecret, crawlerErr := providerSvc.GetDecryptedSecret(context.Background(), "crawler")
+	if crawlerErr == nil && crawlerSecret != "" {
+		apiKey := crawlerSecret
+		var sec struct {
+			APIKey string `json:"api_key"`
+		}
+		if json.Unmarshal([]byte(crawlerSecret), &sec) == nil && sec.APIKey != "" {
+			apiKey = sec.APIKey
+		}
+		crawlerProvider = crawlerInteg.NewJinaReaderProvider(apiKey, logger.L)
+		logger.L.Info("crawler provider: Jina Reader")
+	} else {
+		crawlerProvider = searchInteg.NewStubCrawlerProvider(logger.L)
+		logger.L.Info("crawler provider: stub (no config)")
+	}
+
 	// Worker server
 	workerCfg := worker.ServerConfig{
 		RedisAddr:     redisAddr,
@@ -111,7 +151,7 @@ func main() {
 		Concurrency:   5,
 	}
 
-	srv := worker.NewServer(workerCfg, taskSvc, draftRepo, blockRepo, sourceRepo, lazyLLM, imageSearchProvider, imageGenProvider, logger.L)
+	srv := worker.NewServer(workerCfg, taskSvc, draftRepo, blockRepo, sourceRepo, lazyLLM, searchProvider, crawlerProvider, imageSearchProvider, imageGenProvider, logger.L)
 
 	// Start
 	if err := srv.Start(); err != nil {
