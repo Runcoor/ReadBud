@@ -134,16 +134,29 @@
       <div v-if="previewTask" class="fullscreen-preview-overlay">
         <div class="fullscreen-preview">
           <div class="preview-toolbar">
-            <div class="preview-title">{{ previewTask.keyword }}</div>
+            <div class="preview-title">
+              <span class="preview-keyword">{{ previewTask.keyword }}</span>
+              <el-tag v-if="previewTask.status === 'done'" type="success" size="small">已完成</el-tag>
+              <el-tag v-else-if="previewTask.status === 'failed'" type="danger" size="small">失败</el-tag>
+            </div>
             <div class="preview-actions">
-              <button class="icon-btn" @click="previewTask = null">
+              <button class="icon-btn" @click="closePreview">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
           </div>
-          <div class="preview-content">
-            <DraftPreview v-if="previewTask.result_draft_id" :draft-id="previewTask.result_draft_id" />
-            <div v-else class="drawer-empty">该任务没有生成稿件</div>
+          <div class="preview-body">
+            <!-- Left: Article preview -->
+            <div class="preview-article">
+              <DraftPreview v-if="previewTask.result_draft_id" :draft-id="previewTask.result_draft_id" />
+              <div v-else class="drawer-empty">该任务没有生成稿件</div>
+            </div>
+            <!-- Right: Publish & Distribution -->
+            <div v-if="previewTask.result_draft_id && previewTask.status === 'done'" class="preview-sidebar">
+              <PublishPanel :draft="previewDraft" />
+              <div class="preview-divider"></div>
+              <DistributionPanel :draft-public-id="previewTask.result_draft_id" />
+            </div>
           </div>
         </div>
       </div>
@@ -181,6 +194,26 @@ const showHistory = ref(false)
 const historyTasks = ref<TaskVO[]>([])
 const historyLoading = ref(false)
 const previewTask = ref<TaskVO | null>(null)
+const previewDraft = ref<DraftVO | null>(null)
+
+// When previewTask changes, fetch its draft
+watch(() => previewTask.value?.result_draft_id, async (draftId) => {
+  if (draftId) {
+    try {
+      const res = await getDraft(draftId)
+      previewDraft.value = res.data
+    } catch {
+      previewDraft.value = null
+    }
+  } else {
+    previewDraft.value = null
+  }
+}, { immediate: true })
+
+function closePreview() {
+  previewTask.value = null
+  previewDraft.value = null
+}
 
 // Load history when drawer opens
 watch(showHistory, async (open) => {
@@ -546,29 +579,37 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   z-index: $z-modal;
-  background: var(--surface-secondary);
-  display: flex;
-  flex-direction: column;
+  background: var(--surface-bg);
+  animation: fade-in 0.2s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .fullscreen-preview {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  max-width: 800px;
-  width: 100%;
-  margin: 0 auto;
+  height: 100vh;
 }
 
 .preview-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
 }
 
 .preview-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.preview-keyword {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
@@ -580,21 +621,46 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-.btn-primary-sm {
-  padding: 6px 16px;
-  background: var(--text-primary);
-  color: var(--text-inverse);
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: opacity 150ms;
-  &:hover { opacity: 0.85; }
+.preview-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
 }
 
-.preview-content {
+.preview-article {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  display: flex;
+  justify-content: center;
+}
+
+.preview-sidebar {
+  width: 380px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-light);
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preview-divider {
+  height: 1px;
+  background: var(--border-light);
+}
+
+// Responsive: stack vertically on small screens
+@media (max-width: 1024px) {
+  .preview-body {
+    flex-direction: column;
+  }
+  .preview-sidebar {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border-light);
+    max-height: 40vh;
+  }
 }
 </style>
