@@ -100,6 +100,47 @@ func (s *PublishService) CancelJob(ctx context.Context, publicID string) (*publi
 	return job, nil
 }
 
+// GetArticleURL returns the article URL for a successful publish job.
+func (s *PublishService) GetArticleURL(ctx context.Context, jobID int64) (string, error) {
+	records, err := s.recordRepo.FindByPublishJobID(ctx, jobID)
+	if err != nil {
+		return "", fmt.Errorf("publishService.GetArticleURL: %w", err)
+	}
+	for _, r := range records {
+		if r.ArticleURL != nil && *r.ArticleURL != "" {
+			return *r.ArticleURL, nil
+		}
+	}
+	return "", nil
+}
+
+// RetryJob resets a failed job to queued status for re-processing.
+func (s *PublishService) RetryJob(ctx context.Context, publicID string) (*publish.PublishJob, error) {
+	job, err := s.jobRepo.FindByPublicID(ctx, publicID)
+	if err != nil {
+		return nil, fmt.Errorf("publishService.RetryJob: %w", err)
+	}
+	if job == nil {
+		return nil, ErrNotFound
+	}
+
+	if job.Status != publish.JobStatusFailed {
+		return nil, fmt.Errorf("publishService.RetryJob: only failed jobs can be retried, current status: %s", job.Status)
+	}
+
+	job.Status = publish.JobStatusQueued
+	job.LastError = nil
+	if err := s.jobRepo.Update(ctx, job); err != nil {
+		return nil, fmt.Errorf("publishService.RetryJob: %w", err)
+	}
+
+	s.logger.Info("publish job retried",
+		zap.String("public_id", publicID),
+		zap.Int("retry_count", job.RetryCount),
+	)
+	return job, nil
+}
+
 // ProcessJob executes the stub publish pipeline: create draft -> submit -> poll.
 // Status flow: queued -> submitting -> polling -> success/failed.
 func (s *PublishService) ProcessJob(ctx context.Context, jobID int64, appID string) error {

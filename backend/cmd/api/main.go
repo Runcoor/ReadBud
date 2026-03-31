@@ -9,6 +9,8 @@ import (
 	"readbud/internal/api"
 	apiHTTP "readbud/internal/api/http"
 	"readbud/internal/api/middleware"
+	"readbud/internal/integration/storage"
+	"readbud/internal/integration/wechat"
 	"readbud/internal/pkg/crypto"
 	"readbud/internal/pkg/database"
 	"readbud/internal/pkg/logger"
@@ -104,12 +106,24 @@ func main() {
 		blockRepo := postgres.NewArticleBlockRepository(db)
 		sourceRepo := postgres.NewSourceDocumentRepository(db)
 
+		// Publish repositories
+		publishJobRepo := postgres.NewPublishJobRepository(db)
+		publishRecordRepo := postgres.NewPublishRecordRepository(db)
+		assetRepo := postgres.NewAssetRepository(db)
+
+		// Stub adapters for development
+		stubPublisher := wechat.NewStubWeChatPublisher(logger.L)
+		stubTokenProv := wechat.NewStubTokenProvider()
+		stubStorage := storage.NewStubStorageProvider(logger.L)
+
 		// Services
 		authSvc := service.NewAuthService(userRepo, jwtCfg)
 		providerSvc := service.NewProviderConfigService(providerRepo, encSecret)
 		wechatSvc := service.NewWechatAccountService(wechatRepo, encSecret)
 		taskSvc := service.NewTaskService(taskRepo, sseHub)
 		draftSvc := service.NewDraftService(draftRepo, blockRepo, sourceRepo, taskRepo)
+		contentImageSvc := service.NewContentImageService(assetRepo, stubPublisher, stubStorage, stubTokenProv, logger.L)
+		publishSvc := service.NewPublishService(publishJobRepo, publishRecordRepo, stubPublisher, stubTokenProv, contentImageSvc, logger.L)
 
 		// Handlers
 		authHandler := apiHTTP.NewAuthHandler(authSvc)
@@ -118,6 +132,7 @@ func main() {
 		taskHandler := apiHTTP.NewTaskHandler(taskSvc)
 		draftHandler := apiHTTP.NewDraftHandler(draftSvc)
 		sourceHandler := apiHTTP.NewSourceHandler(draftSvc)
+		publishHandler := apiHTTP.NewPublishHandler(publishSvc, draftRepo, wechatRepo)
 
 		// Public routes (no auth required)
 		authHandler.RegisterRoutes(v1)
@@ -131,6 +146,7 @@ func main() {
 			wechatHandler.RegisterRoutes(protected)
 			taskHandler.RegisterRoutes(protected)
 			draftHandler.RegisterRoutes(protected)
+			publishHandler.RegisterRoutes(protected)
 			protected.GET("/tasks/:id/events", sseHub.ServeHTTP("id"))
 			protected.GET("/tasks/:id/sources", sourceHandler.GetTaskSources)
 		}

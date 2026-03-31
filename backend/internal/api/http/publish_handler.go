@@ -38,6 +38,7 @@ func (h *PublishHandler) RegisterRoutes(rg *gin.RouterGroup) {
 		publish.POST("", h.CreateJob)
 		publish.GET("/:id", h.GetJob)
 		publish.POST("/:id/cancel", h.CancelJob)
+		publish.POST("/:id/retry", h.RetryJob)
 	}
 }
 
@@ -92,13 +93,43 @@ func (h *PublishHandler) GetJob(c *gin.Context) {
 		return
 	}
 
-	apiPkg.OK(c, gin.H{
+	resp := gin.H{
 		"id":           job.PublicID,
 		"publish_mode": job.PublishMode,
 		"status":       job.Status,
 		"retry_count":  job.RetryCount,
 		"last_error":   job.LastError,
 		"created_at":   job.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+
+	// Include article_url from publish record if job succeeded
+	if job.Status == "success" {
+		articleURL, _ := h.publishService.GetArticleURL(c.Request.Context(), job.ID)
+		if articleURL != "" {
+			resp["article_url"] = articleURL
+		}
+	}
+
+	apiPkg.OK(c, resp)
+}
+
+// RetryJob handles POST /api/v1/publish/jobs/:id/retry.
+func (h *PublishHandler) RetryJob(c *gin.Context) {
+	publicID := c.Param("id")
+
+	job, err := h.publishService.RetryJob(c.Request.Context(), publicID)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			apiPkg.NotFound(c, "发布任务不存在")
+			return
+		}
+		apiPkg.BadRequest(c, err.Error())
+		return
+	}
+
+	apiPkg.OK(c, gin.H{
+		"id":     job.PublicID,
+		"status": job.Status,
 	})
 }
 
