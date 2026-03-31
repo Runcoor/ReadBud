@@ -134,10 +134,19 @@ export const useTaskStore = defineStore('task', () => {
       disconnectSSE()
     })
 
-    es.addEventListener('done', () => {
+    es.addEventListener('done', (event: MessageEvent) => {
       if (currentTask.value) {
         currentTask.value.status = 'done'
         currentTask.value.progress = 100
+        // Extract result_draft_id from event payload
+        try {
+          const payload = JSON.parse(event.data) as {
+            data: { result_draft_id?: string }
+          }
+          if (payload.data?.result_draft_id) {
+            currentTask.value.result_draft_id = payload.data.result_draft_id
+          }
+        } catch { /* ignore */ }
       }
       disconnectSSE()
     })
