@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"readbud/internal/adapter"
+	"readbud/internal/domain"
 	"readbud/internal/domain/draft"
 	"readbud/internal/domain/source"
 	taskDomain "readbud/internal/domain/task"
@@ -19,6 +20,8 @@ import (
 	"readbud/internal/repository/postgres"
 	"readbud/internal/service"
 	pipelinePkg "readbud/internal/service/pipeline"
+
+	"gorm.io/datatypes"
 )
 
 // Server wraps the Asynq server and registers pipeline handlers.
@@ -30,6 +33,7 @@ type Server struct {
 	draftRepo       postgres.ArticleDraftRepository
 	blockRepo       postgres.ArticleBlockRepository
 	sourceRepo      postgres.SourceDocumentRepository
+	brandRepo       postgres.BrandProfileRepository
 	llmProvider     adapter.LLMProvider
 	searchProvider  adapter.SearchProvider
 	crawlerProvider adapter.CrawlerProvider
@@ -53,6 +57,7 @@ func NewServer(
 	draftRepo postgres.ArticleDraftRepository,
 	blockRepo postgres.ArticleBlockRepository,
 	sourceRepo postgres.SourceDocumentRepository,
+	brandRepo postgres.BrandProfileRepository,
 	llmProvider adapter.LLMProvider,
 	searchProvider adapter.SearchProvider,
 	crawlerProvider adapter.CrawlerProvider,
@@ -93,6 +98,7 @@ func NewServer(
 		draftRepo:       draftRepo,
 		blockRepo:       blockRepo,
 		sourceRepo:      sourceRepo,
+		brandRepo:       brandRepo,
 		llmProvider:     llmProvider,
 		searchProvider:  searchProvider,
 		crawlerProvider: crawlerProvider,
@@ -156,6 +162,183 @@ func (s *Server) callLLM(ctx context.Context, systemPrompt, userPrompt string, m
 		return "", err
 	}
 	return resp.Content, nil
+}
+
+// ---------- Prompt Builder Helpers ----------
+
+var styleSkeletonMap = map[string]string{
+	"minimal": `【本次风格：极简专业型】
+- 开头方式：用一个震撼数据或反常识断言切入
+- 结构：lead → 2-3个section → summary → cta
+- 段落：短段落，高信息密度，每段1-3行
+- 小标题：简短有力，不要像PPT
+- 可用block类型：lead, section, quote, summary, cta`,
+
+	"magazine": `【本次风格：杂志编辑型】
+- 开头方式：用一个具体的场景描写或人物故事切入
+- 结构：lead → 3-4个section（穿插quote金句框）→ cta
+- 段落：中长段落，叙事感强，有画面感
+- 小标题：有设计感，体现编辑品味
+- 可用block类型：lead, section, quote, cta`,
+
+	"listicle": `【本次风格：清单干货型】
+- 开头方式：用一个痛点提问切入
+- 结构：lead → 3-5个section（穿插checklist清单）→ summary → cta
+- 段落：分点明确，每节有一句总结
+- 小标题：数字序号开头，如"1. xxx"
+- 可用block类型：lead, section, checklist, summary, cta`,
+
+	"narrative": `【本次风格：叙事故事型】
+- 开头方式：用一个具体的人物或场景切入
+- 结构：lead → 3个section（穿插quote）→ cta
+- 段落：长短交替，有故事弧线，有转折
+- 小标题：简洁，服务于叙事节奏
+- 可用block类型：lead, section, quote, cta`,
+
+	"faq": `【本次风格：问答拆解型】
+- 开头方式：直接抛出核心问题
+- 结构：lead → 3-5个section（每个小标题为一个问句）→ summary → cta
+- 段落：问答节奏，每个回答控制在200字内
+- 小标题：必须是问句形式，如"为什么xxx？""xxx怎么办？"
+- 可用block类型：lead, section, summary, cta`,
+
+	"casual": `【本次风格：轻社交型】
+- 开头方式：像朋友圈长文一样，用一句短句切入
+- 结构：lead → 2-3个section（穿插quote金句）→ cta
+- 段落：句子短，留白多，金句多，每段不超过2行
+- 小标题：轻松随意，口语化
+- 可用block类型：lead, section, quote, cta`,
+}
+
+func buildStyleSkeleton(style string) string {
+	if s, ok := styleSkeletonMap[style]; ok {
+		return s
+	}
+	return styleSkeletonMap["minimal"]
+}
+
+func (s *Server) buildBrandConstraint(ctx context.Context, brandProfileID *int64) string {
+	var bp *domain.BrandProfile
+
+	if brandProfileID != nil {
+		bp, _ = s.brandRepo.FindByID(ctx, *brandProfileID)
+	}
+	if bp == nil {
+		bp, _ = s.brandRepo.FindDefault(ctx)
+	}
+	if bp == nil {
+		return "【品牌调性】专业、有温度、简洁\n【禁用词】让我们、随着...的发展、赋能、闭环、打造、值得一提的是、综上所述、在当今社会、毋庸置疑\n"
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("【品牌调性】%s\n", bp.BrandTone))
+
+	var forbidden []string
+	if len(bp.ForbiddenWords) > 0 {
+		_ = json.Unmarshal(bp.ForbiddenWords, &forbidden)
+	}
+	if len(forbidden) == 0 {
+		forbidden = []string{"让我们", "随着...的发展", "赋能", "闭环", "打造", "值得一提的是", "综上所述", "在当今社会", "毋庸置疑"}
+	}
+	sb.WriteString(fmt.Sprintf("【禁用词】%s\n", strings.Join(forbidden, "、")))
+
+	var preferred []string
+	if len(bp.PreferredWords) > 0 {
+		_ = json.Unmarshal(bp.PreferredWords, &preferred)
+	}
+	if len(preferred) > 0 {
+		sb.WriteString(fmt.Sprintf("【偏好用词】%s\n", strings.Join(preferred, "、")))
+	}
+
+	return sb.String()
+}
+
+func (s *Server) buildDedupConstraint(ctx context.Context, brandProfileID *int64) string {
+	drafts, err := s.draftRepo.FindRecentFingerprints(ctx, 10, brandProfileID)
+	if err != nil || len(drafts) == 0 {
+		return ""
+	}
+
+	openingCounts := map[string]int{}
+	titleCounts := map[string]int{}
+	ctaCounts := map[string]int{}
+
+	for _, d := range drafts {
+		if d.OpeningType != "" {
+			openingCounts[d.OpeningType]++
+		}
+		if d.TitlePattern != "" {
+			titleCounts[d.TitlePattern]++
+		}
+		if d.CTAType != "" {
+			ctaCounts[d.CTAType]++
+		}
+	}
+
+	var sb strings.Builder
+	sb.WriteString("【变化要求——避免与近期文章重复】\n")
+
+	if len(openingCounts) > 0 {
+		sb.WriteString("- 近期开头方式已用过：")
+		parts := []string{}
+		for k, v := range openingCounts {
+			parts = append(parts, fmt.Sprintf("%s(%d次)", k, v))
+		}
+		sb.WriteString(strings.Join(parts, "、"))
+		allOpenings := []string{"data", "scene", "contrarian", "question", "story"}
+		unused := []string{}
+		for _, o := range allOpenings {
+			if openingCounts[o] == 0 {
+				unused = append(unused, o)
+			}
+		}
+		if len(unused) > 0 {
+			sb.WriteString("，请优先使用：" + strings.Join(unused, "、"))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(titleCounts) > 0 {
+		sb.WriteString("- 近期标题句式已用过：")
+		parts := []string{}
+		for k, v := range titleCounts {
+			parts = append(parts, fmt.Sprintf("%s(%d次)", k, v))
+		}
+		sb.WriteString(strings.Join(parts, "、"))
+		allTitles := []string{"question", "colon", "number", "assertion", "howto"}
+		unused := []string{}
+		for _, t := range allTitles {
+			if titleCounts[t] == 0 {
+				unused = append(unused, t)
+			}
+		}
+		if len(unused) > 0 {
+			sb.WriteString("，请优先使用：" + strings.Join(unused, "、"))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(ctaCounts) > 0 {
+		sb.WriteString("- 近期CTA方式已用过：")
+		parts := []string{}
+		for k, v := range ctaCounts {
+			parts = append(parts, fmt.Sprintf("%s(%d次)", k, v))
+		}
+		sb.WriteString(strings.Join(parts, "、"))
+		allCTAs := []string{"action", "question", "challenge", "reflection"}
+		unused := []string{}
+		for _, c := range allCTAs {
+			if ctaCounts[c] == 0 {
+				unused = append(unused, c)
+			}
+		}
+		if len(unused) > 0 {
+			sb.WriteString("，请优先使用：" + strings.Join(unused, "、"))
+		}
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
 }
 
 // ---------- Pipeline Stage Handlers ----------
@@ -408,41 +591,65 @@ func (s *Server) handleArticleWrite(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("handleArticleWrite: task not found")
 	}
 
-	// Call LLM to write the article
-	content, err := s.callLLM(ctx,
-		`你是一位拥有十年以上写作经验的资深内容专家，擅长将复杂话题转化为引人入胜、富有洞见的深度文章。你的文字风格兼具专业深度与阅读愉悦感——像一位博学的朋友在跟读者促膝长谈。
+	// Build 5-module system prompt
+	var sysPrompt strings.Builder
 
-写作原则：
-- 观点鲜明：每个段落都有明确的核心论点，不说正确的废话
-- 有血有肉：用真实的案例、数据、场景描写来支撑观点，避免空洞说教
-- 节奏感强：长短句交替，适当使用反问、设问、类比来制造阅读节奏
-- 反常识切入：开头尝试用一个颠覆认知的事实、一个反直觉的观点、或一个具体的场景切入，而非老套的"随着...的发展"
-- 自然表达：像真人在写文章，允许偶尔的口语化表达、个人判断和态度，而非面面俱到的中立客观
-- 结尾有力：结尾给读者一个可执行的行动建议或一个值得深思的问题，而非空洞总结
+	// Module 1: Role
+	sysPrompt.WriteString("你是一位资深微信公众号主编，擅长把复杂话题写成\"简洁、有质感、有传播力\"的图文文章。你的文字像一位博学的朋友在促膝长谈——专业但不居高临下，有态度但不偏激。\n\n")
 
-绝对禁止的 AI 味道：
-- 不要使用"让我们""在当今社会""随着...的发展""总而言之""综上所述"等套话
-- 不要每段都以"首先""其次""最后"来结构化
-- 不要使用排比句超过2组
-- 不要在结尾做大而空的升华
+	// Module 2: Brand constraint
+	sysPrompt.WriteString(s.buildBrandConstraint(ctx, task.BrandProfileID))
+	sysPrompt.WriteString("\n")
 
-同时，请在文章开头的 lead block 中写一段能立即抓住注意力的开场白（可以是一个震撼数据、一个反常识断言、或一个读者一定有共鸣的场景描写），让人忍不住继续读下去。
+	// Module 3: Style skeleton
+	style := task.ArticleStyle
+	if style == "" {
+		style = "minimal"
+	}
+	sysPrompt.WriteString(buildStyleSkeleton(style))
+	sysPrompt.WriteString("\n\n")
 
-在结尾的 cta block 中，设计一段有创意的结尾：不要简单的"关注我们"，而是给出一个具体的、读者今天就能做的小行动，或抛出一个引发思考的好问题。用精美的HTML来呈现这段结尾卡片，使其具有视觉吸引力。
+	// Module 4: Dedup constraint
+	dedup := s.buildDedupConstraint(ctx, task.BrandProfileID)
+	if dedup != "" {
+		sysPrompt.WriteString(dedup)
+		sysPrompt.WriteString("\n")
+	}
 
-返回严格的JSON格式（不要markdown代码块），结构如下：
+	// Module 5: Writing rules + output format
+	sysPrompt.WriteString(`【写作规范】
+- 观点鲜明：每段都有核心论点，不说正确的废话
+- 有血有肉：用真实案例、数据、场景描写支撑观点，不空洞说教
+- 节奏感：长短句交替，适当用反问、类比制造阅读节奏
+- 自然表达：像真人写文章，允许口语化和个人判断
+- 手机阅读：段落短，每段1-3行，留白足，小标题清晰
+- 排比句不超过2组
+- 不要每段都用"首先""其次""最后"结构化
+- 结尾给读者一个可执行的行动建议或值得深思的问题
+
+【输出格式】返回严格JSON（不要markdown代码块）：
 {
-  "title": "一个让人想点开的标题（可以用冒号分隔主副标题）",
-  "digest": "100字以内的文章摘要，要有信息密度，不要空洞形容词",
-  "cover_prompt": "一段英文提示词，用于AI生成与文章主题匹配的封面图，描述清晰、色彩明亮、构图优美",
+  "titles": ["标题备选1", "标题备选2", "标题备选3"],
+  "digest": "100字以内摘要，有信息密度，不要空洞形容词",
+  "cover_prompt": "英文封面图提示词，描述清晰、色彩明亮、构图优美",
+  "opening_type": "本文使用的开头方式：data|scene|contrarian|question|story",
+  "title_pattern": "推荐的标题句式：question|colon|number|assertion|howto",
+  "cta_type": "结尾方式：action|question|challenge|reflection",
   "blocks": [
     {"type": "lead", "content": "引言段落（抓眼球的开头）"},
-    {"type": "section", "heading": "第一节标题", "content": "第一节正文内容，支持HTML标签如<strong>加粗</strong>、<em>斜体</em>等"},
-    {"type": "section", "heading": "第二节标题", "content": "第二节内容..."},
-    {"type": "section", "heading": "第三节标题", "content": "第三节内容..."},
-    {"type": "cta", "content": "<div style='background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:16px;padding:32px;color:#fff;text-align:center'><h3 style='margin:0 0 12px;font-size:20px'>结尾卡片标题</h3><p style='margin:0;opacity:0.9;font-size:15px;line-height:1.6'>具体的行动号召或思考问题</p></div>"}
+    {"type": "section", "heading": "小标题", "content": "正文内容"},
+    {"type": "quote", "content": "金句或重要引用"},
+    {"type": "checklist", "content": "- 要点1\n- 要点2\n- 要点3"},
+    {"type": "summary", "content": "核心结论浓缩"},
+    {"type": "cta", "content": "行动号召或互动问题"}
   ]
-}`,
+}
+
+注意：blocks中请根据风格要求灵活选用block类型，不需要全部使用。titles必须提供3个不同句式的备选标题。`)
+
+	// Call LLM to write the article
+	content, err := s.callLLM(ctx,
+		sysPrompt.String(),
 		func() string {
 			userPrompt := fmt.Sprintf("关键词: %s\n目标受众: %s\n语气风格: %s\n目标字数: %d", task.Keyword, task.Audience, task.Tone, task.TargetWords)
 			if p.CrawledContent != "" {
@@ -465,10 +672,14 @@ func (s *Server) handleArticleWrite(ctx context.Context, t *asynq.Task) error {
 		Content string `json:"content"`
 	}
 	type articleOutput struct {
-		Title       string         `json:"title"`
-		Digest      string         `json:"digest"`
-		CoverPrompt string         `json:"cover_prompt,omitempty"`
-		Blocks      []articleBlock `json:"blocks"`
+		Titles       []string       `json:"titles"`
+		Title        string         `json:"title"`
+		Digest       string         `json:"digest"`
+		CoverPrompt  string         `json:"cover_prompt,omitempty"`
+		OpeningType  string         `json:"opening_type,omitempty"`
+		TitlePattern string         `json:"title_pattern,omitempty"`
+		CTAType      string         `json:"cta_type,omitempty"`
+		Blocks       []articleBlock `json:"blocks"`
 	}
 
 	var article articleOutput
@@ -485,19 +696,33 @@ func (s *Server) handleArticleWrite(ctx context.Context, t *asynq.Task) error {
 		}
 	}
 
-	if article.Title == "" {
-		article.Title = task.Keyword
+	title := article.Title
+	if len(article.Titles) > 0 {
+		title = article.Titles[0]
+	}
+	if title == "" {
+		title = task.Keyword
 	}
 
 	// Create draft in DB
 	d := draft.ArticleDraft{
 		TaskID:       task.ID,
-		Title:        article.Title,
+		Title:        title,
 		Digest:       article.Digest,
 		AuthorName:   "阅芽 AI",
 		ReviewStatus: "pending",
 		RiskLevel:    "low",
 		Version:      1,
+		StyleUsed:    style,
+		OpeningType:  article.OpeningType,
+		TitlePattern: article.TitlePattern,
+		CTAType:      article.CTAType,
+	}
+	if len(article.Titles) > 1 {
+		titlesJSON, _ := json.Marshal(map[string]interface{}{
+			"title_options": article.Titles,
+		})
+		d.OutlineJSON = datatypes.JSON(titlesJSON)
 	}
 	if err := s.draftRepo.Create(ctx, &d); err != nil {
 		s.taskSvc.MarkFailed(ctx, p.TaskID, fmt.Sprintf("保存草稿失败: %v", err))

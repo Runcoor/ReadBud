@@ -156,7 +156,7 @@ func main() {
 		Concurrency:   5,
 	}
 
-	srv := worker.NewServer(workerCfg, taskSvc, draftRepo, blockRepo, sourceRepo, lazyLLM, searchProvider, crawlerProvider, imageSearchProvider, imageGenProvider, logger.L)
+	srv := worker.NewServer(workerCfg, taskSvc, draftRepo, blockRepo, sourceRepo, brandRepo, lazyLLM, searchProvider, crawlerProvider, imageSearchProvider, imageGenProvider, logger.L)
 
 	// Start
 	if err := srv.Start(); err != nil {
