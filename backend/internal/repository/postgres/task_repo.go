@@ -19,6 +19,8 @@ type TaskRepository interface {
 	Update(ctx context.Context, t *task.ContentTask) error
 	ListByStatus(ctx context.Context, status string, limit, offset int) ([]task.ContentTask, int64, error)
 	ListRecent(ctx context.Context, limit, offset int) ([]task.ContentTask, int64, error)
+	Delete(ctx context.Context, id int64) error
+	BatchDelete(ctx context.Context, ids []int64) error
 }
 
 type taskRepo struct {
@@ -103,4 +105,21 @@ func (r *taskRepo) ListRecent(ctx context.Context, limit, offset int) ([]task.Co
 		return nil, 0, fmt.Errorf("taskRepo.ListRecent: %w", err)
 	}
 	return tasks, total, nil
+}
+
+func (r *taskRepo) Delete(ctx context.Context, id int64) error {
+	if err := r.db.WithContext(ctx).Delete(&task.ContentTask{}, id).Error; err != nil {
+		return fmt.Errorf("taskRepo.Delete: %w", err)
+	}
+	return nil
+}
+
+func (r *taskRepo) BatchDelete(ctx context.Context, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	if err := r.db.WithContext(ctx).Where("id IN ?", ids).Delete(&task.ContentTask{}).Error; err != nil {
+		return fmt.Errorf("taskRepo.BatchDelete: %w", err)
+	}
+	return nil
 }

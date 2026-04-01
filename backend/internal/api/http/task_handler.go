@@ -26,8 +26,10 @@ func (h *TaskHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	tasks := rg.Group("/tasks")
 	{
 		tasks.POST("", h.Create)
+		tasks.POST("/batch-delete", h.BatchDelete)
 		tasks.GET("", h.List)
 		tasks.GET("/:id", h.Get)
+		tasks.DELETE("/:id", h.Delete)
 		tasks.POST("/:id/retry", h.Retry)
 		tasks.POST("/:id/cancel", h.CancelTask)
 	}
@@ -112,6 +114,36 @@ func (h *TaskHandler) CancelTask(c *gin.Context) {
 	}
 
 	apiPkg.OK(c, nil)
+}
+
+// Delete handles DELETE /api/v1/tasks/:id.
+func (h *TaskHandler) Delete(c *gin.Context) {
+	publicID := c.Param("id")
+	err := h.taskService.Delete(c.Request.Context(), publicID)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			apiPkg.NotFound(c, "任务不存在")
+			return
+		}
+		apiPkg.InternalError(c, "删除失败")
+		return
+	}
+	apiPkg.OK(c, gin.H{"message": "已删除"})
+}
+
+// BatchDelete handles POST /api/v1/tasks/batch-delete.
+func (h *TaskHandler) BatchDelete(c *gin.Context) {
+	var req dto.BatchDeleteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apiPkg.HandleBindError(c, err)
+		return
+	}
+	count, err := h.taskService.BatchDelete(c.Request.Context(), req.IDs)
+	if err != nil {
+		apiPkg.InternalError(c, "批量删除失败")
+		return
+	}
+	apiPkg.OK(c, gin.H{"deleted": count})
 }
 
 // Retry handles POST /api/v1/tasks/:id/retry.

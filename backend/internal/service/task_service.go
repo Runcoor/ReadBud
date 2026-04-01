@@ -334,6 +334,40 @@ func (s *TaskService) resolveDraftPublicID(ctx context.Context, draftID *int64) 
 	return &d.PublicID
 }
 
+// Delete soft-deletes a task by its public ID.
+func (s *TaskService) Delete(ctx context.Context, publicID string) error {
+	t, err := s.taskRepo.FindByPublicID(ctx, publicID)
+	if err != nil {
+		return fmt.Errorf("taskService.Delete: %w", err)
+	}
+	if t == nil {
+		return ErrNotFound
+	}
+	return s.taskRepo.Delete(ctx, t.ID)
+}
+
+// BatchDelete soft-deletes multiple tasks by their public IDs.
+func (s *TaskService) BatchDelete(ctx context.Context, publicIDs []string) (int, error) {
+	if len(publicIDs) == 0 {
+		return 0, nil
+	}
+	var ids []int64
+	for _, pid := range publicIDs {
+		t, err := s.taskRepo.FindByPublicID(ctx, pid)
+		if err != nil || t == nil {
+			continue
+		}
+		ids = append(ids, t.ID)
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	if err := s.taskRepo.BatchDelete(ctx, ids); err != nil {
+		return 0, fmt.Errorf("taskService.BatchDelete: %w", err)
+	}
+	return len(ids), nil
+}
+
 func taskToVO(t taskDomain.ContentTask, draftPublicID *string, brandPublicID *string) dto.TaskVO {
 	return dto.TaskVO{
 		ID:             t.PublicID,

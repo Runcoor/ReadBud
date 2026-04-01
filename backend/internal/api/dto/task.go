@@ -18,6 +18,11 @@ type CreateTaskRequest struct {
 	BrandProfileID  *string    `json:"brand_profile_id,omitempty"`
 }
 
+// BatchDeleteRequest is the DTO for batch delete operations.
+type BatchDeleteRequest struct {
+	IDs []string `json:"ids" binding:"required,min=1"`
+}
+
 // TaskVO is the view object for task display.
 type TaskVO struct {
 	ID              string     `json:"id"`
