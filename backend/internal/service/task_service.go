@@ -297,6 +297,16 @@ func (s *TaskService) CancelTask(ctx context.Context, publicID string) error {
 	return nil
 }
 
+// UpdateArticleStyle updates the article style for a task.
+func (s *TaskService) UpdateArticleStyle(ctx context.Context, taskID int64, style string) error {
+	t, err := s.taskRepo.FindByID(ctx, taskID)
+	if err != nil || t == nil {
+		return fmt.Errorf("taskService.UpdateArticleStyle: task not found")
+	}
+	t.ArticleStyle = style
+	return s.taskRepo.Update(ctx, t)
+}
+
 // GetByID returns a task by its internal ID.
 func (s *TaskService) GetByID(ctx context.Context, id int64) (*taskDomain.ContentTask, error) {
 	return s.taskRepo.FindByID(ctx, id)

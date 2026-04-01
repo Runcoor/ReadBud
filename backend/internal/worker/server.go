@@ -178,22 +178,69 @@ func (s *Server) handleKeywordExpand(ctx context.Context, t *asynq.Task) error {
 	}
 
 	// Call LLM to expand keyword into search queries
-	content, err := s.callLLM(ctx,
-		"你是一个内容研究助手。根据给定的关键词、受众和语气，生成5个搜索查询词，用于搜集相关素材。只返回JSON数组，不要其他内容。",
-		fmt.Sprintf("关键词: %s\n受众: %s\n语气: %s\n\n请返回JSON数组格式的5个搜索查询词。", task.Keyword, task.Audience, task.Tone),
-		500,
-	)
-	if err != nil {
-		s.logger.Warn("LLM keyword expand failed, using original keyword", zap.Error(err))
-		p.Queries = []string{task.Keyword}
-	} else {
-		// Parse JSON array
-		var queries []string
-		cleaned := extractJSON(content)
-		if json.Unmarshal([]byte(cleaned), &queries) != nil || len(queries) == 0 {
-			queries = []string{task.Keyword}
+	// When no article style is set, also ask LLM to recommend one
+	if task.ArticleStyle == "" {
+		type expandResult struct {
+			Queries          []string `json:"queries"`
+			RecommendedStyle string   `json:"recommended_style"`
 		}
-		p.Queries = queries
+
+		systemPrompt := `你是一个内容研究助手。根据给定的关键词、受众和语气，完成两个任务：
+1. 生成5个搜索查询词，用于搜集相关素材
+2. 根据主题和受众特征，推荐最合适的文章风格
+
+可选风格：
+- minimal：极简专业型，适合知识、行业、B2B内容
+- magazine：杂志编辑型，适合品牌故事、人物、深度观点
+- listicle：清单干货型，适合教程、攻略、经验复盘
+- narrative：叙事故事型，适合案例、转化、品牌温度
+- faq：问答拆解型，适合教育用户、解释复杂概念
+- casual：轻社交型，适合情绪、观点、生活方式
+
+返回严格JSON（不要markdown代码块）：
+{"queries": ["query1", "query2", "query3", "query4", "query5"], "recommended_style": "minimal"}`
+
+		content, err := s.callLLM(ctx,
+			systemPrompt,
+			fmt.Sprintf("关键词: %s\n受众: %s\n语气: %s", task.Keyword, task.Audience, task.Tone),
+			500,
+		)
+		if err != nil {
+			s.logger.Warn("LLM keyword expand failed, using original keyword", zap.Error(err))
+			p.Queries = []string{task.Keyword}
+		} else {
+			cleaned := extractJSON(content)
+			var result expandResult
+			if json.Unmarshal([]byte(cleaned), &result) != nil || len(result.Queries) == 0 {
+				p.Queries = []string{task.Keyword}
+			} else {
+				p.Queries = result.Queries
+				if taskDomain.ValidArticleStyles[result.RecommendedStyle] {
+					if styleErr := s.taskSvc.UpdateArticleStyle(ctx, p.TaskID, result.RecommendedStyle); styleErr != nil {
+						s.logger.Warn("failed to save recommended article style", zap.Error(styleErr))
+					} else {
+						s.logger.Info("recommended article style saved", zap.String("style", result.RecommendedStyle))
+					}
+				}
+			}
+		}
+	} else {
+		content, err := s.callLLM(ctx,
+			"你是一个内容研究助手。根据给定的关键词、受众和语气，生成5个搜索查询词，用于搜集相关素材。只返回JSON数组，不要其他内容。",
+			fmt.Sprintf("关键词: %s\n受众: %s\n语气: %s\n\n请返回JSON数组格式的5个搜索查询词。", task.Keyword, task.Audience, task.Tone),
+			500,
+		)
+		if err != nil {
+			s.logger.Warn("LLM keyword expand failed, using original keyword", zap.Error(err))
+			p.Queries = []string{task.Keyword}
+		} else {
+			var queries []string
+			cleaned := extractJSON(content)
+			if json.Unmarshal([]byte(cleaned), &queries) != nil || len(queries) == 0 {
+				queries = []string{task.Keyword}
+			}
+			p.Queries = queries
+		}
 	}
 
 	s.logger.Info("keyword expand done", zap.Int("queries", len(p.Queries)))
