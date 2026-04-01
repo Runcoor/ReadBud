@@ -1,4 +1,4 @@
-import { get, post } from './request'
+import { del, get, post } from './request'
 import type { ApiResponse } from '@/types/api'
 import type { CreateTaskRequest, TaskVO, TaskListResponse } from '@/types/task'
 
@@ -22,6 +22,16 @@ export function listTasks(page = 1, pageSize = 20, status?: string): Promise<Api
 /** Retry a failed task */
 export function retryTask(id: string): Promise<ApiResponse<TaskVO>> {
   return post<ApiResponse<TaskVO>>(`/tasks/${id}/retry`)
+}
+
+/** Delete a task */
+export function deleteTask(id: string): Promise<ApiResponse<{ message: string }>> {
+  return del<ApiResponse<{ message: string }>>(`/tasks/${id}`)
+}
+
+/** Batch delete tasks */
+export function batchDeleteTasks(ids: string[]): Promise<ApiResponse<{ deleted: number }>> {
+  return post<ApiResponse<{ deleted: number }>>('/tasks/batch-delete', { ids })
 }
 
 /** Cancel a pending or running task */
