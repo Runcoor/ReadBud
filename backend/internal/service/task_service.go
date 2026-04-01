@@ -21,11 +21,12 @@ type TaskService struct {
 	draftRepo   postgres.ArticleDraftRepository
 	publisher   sse.EventPublisher
 	asynqClient *asynq.Client
+	brandRepo   postgres.BrandProfileRepository
 }
 
 // NewTaskService creates a new TaskService.
-func NewTaskService(taskRepo postgres.TaskRepository, draftRepo postgres.ArticleDraftRepository, publisher sse.EventPublisher, asynqClient *asynq.Client) *TaskService {
-	return &TaskService{taskRepo: taskRepo, draftRepo: draftRepo, publisher: publisher, asynqClient: asynqClient}
+func NewTaskService(taskRepo postgres.TaskRepository, draftRepo postgres.ArticleDraftRepository, publisher sse.EventPublisher, asynqClient *asynq.Client, brandRepo postgres.BrandProfileRepository) *TaskService {
+	return &TaskService{taskRepo: taskRepo, draftRepo: draftRepo, publisher: publisher, asynqClient: asynqClient, brandRepo: brandRepo}
 }
 
 // Create creates a new content task and enqueues the pipeline.
@@ -38,10 +39,22 @@ func (s *TaskService) Create(ctx context.Context, req dto.CreateTaskRequest) (*d
 		TargetWords: req.TargetWords,
 		ImageMode:   req.ImageMode,
 		ChartMode:   req.ChartMode,
-		PublishMode: req.PublishMode,
-		PublishAt:   req.PublishAt,
-		Status:      taskDomain.StatusPending,
+		PublishMode:   req.PublishMode,
+		PublishAt:     req.PublishAt,
+		ArticleStyle: req.ArticleStyle,
+		Status:        taskDomain.StatusPending,
 		Progress:    0,
+	}
+
+	if req.VisualEnhance != nil {
+		t.VisualEnhance = *req.VisualEnhance
+	}
+
+	if req.BrandProfileID != nil && *req.BrandProfileID != "" {
+		bp, bpErr := s.brandRepo.FindByPublicID(ctx, *req.BrandProfileID)
+		if bpErr == nil && bp != nil {
+			t.BrandProfileID = &bp.ID
+		}
 	}
 
 	if t.TargetWords == 0 {
@@ -66,7 +79,7 @@ func (s *TaskService) Create(ctx context.Context, req dto.CreateTaskRequest) (*d
 		}
 	}
 
-	vo := taskToVO(t, nil)
+	vo := taskToVO(t, nil, nil)
 	return &vo, nil
 }
 
@@ -79,7 +92,7 @@ func (s *TaskService) GetByPublicID(ctx context.Context, publicID string) (*dto.
 	if t == nil {
 		return nil, ErrNotFound
 	}
-	vo := taskToVO(*t, s.resolveDraftPublicID(ctx, t.ResultDraftID))
+	vo := taskToVO(*t, s.resolveDraftPublicID(ctx, t.ResultDraftID), s.resolveBrandPublicID(ctx, t.BrandProfileID))
 	return &vo, nil
 }
 
@@ -108,7 +121,7 @@ func (s *TaskService) ListRecent(ctx context.Context, page, pageSize int, status
 
 	items := make([]dto.TaskVO, 0, len(tasks))
 	for _, t := range tasks {
-		items = append(items, taskToVO(t, s.resolveDraftPublicID(ctx, t.ResultDraftID)))
+		items = append(items, taskToVO(t, s.resolveDraftPublicID(ctx, t.ResultDraftID), s.resolveBrandPublicID(ctx, t.BrandProfileID)))
 	}
 
 	return &dto.TaskListResponse{
@@ -253,7 +266,7 @@ func (s *TaskService) Retry(ctx context.Context, publicID string) (*dto.TaskVO, 
 		}
 	}
 
-	vo := taskToVO(*t, nil)
+	vo := taskToVO(*t, nil, s.resolveBrandPublicID(ctx, t.BrandProfileID))
 	return &vo, nil
 }
 
@@ -289,6 +302,17 @@ func (s *TaskService) GetByID(ctx context.Context, id int64) (*taskDomain.Conten
 	return s.taskRepo.FindByID(ctx, id)
 }
 
+func (s *TaskService) resolveBrandPublicID(ctx context.Context, brandID *int64) *string {
+	if brandID == nil || s.brandRepo == nil {
+		return nil
+	}
+	bp, err := s.brandRepo.FindByID(ctx, *brandID)
+	if err != nil || bp == nil {
+		return nil
+	}
+	return &bp.PublicID
+}
+
 func (s *TaskService) resolveDraftPublicID(ctx context.Context, draftID *int64) *string {
 	if draftID == nil || s.draftRepo == nil {
 		return nil
@@ -300,24 +324,27 @@ func (s *TaskService) resolveDraftPublicID(ctx context.Context, draftID *int64) 
 	return &d.PublicID
 }
 
-func taskToVO(t taskDomain.ContentTask, draftPublicID *string) dto.TaskVO {
+func taskToVO(t taskDomain.ContentTask, draftPublicID *string, brandPublicID *string) dto.TaskVO {
 	return dto.TaskVO{
-		ID:            t.PublicID,
-		TaskNo:        t.TaskNo,
-		Keyword:       t.Keyword,
-		Audience:      t.Audience,
-		Tone:          t.Tone,
-		TargetWords:   t.TargetWords,
-		ImageMode:     t.ImageMode,
-		ChartMode:     t.ChartMode,
-		PublishMode:   t.PublishMode,
-		PublishAt:     t.PublishAt,
-		Status:        t.Status,
-		Progress:      t.Progress,
-		CurrentStage:  t.CurrentStage,
-		ErrorMessage:  t.ErrorMessage,
-		ResultDraftID: draftPublicID,
-		CreatedAt:     t.CreatedAt,
-		UpdatedAt:     t.UpdatedAt,
+		ID:             t.PublicID,
+		TaskNo:         t.TaskNo,
+		Keyword:        t.Keyword,
+		Audience:       t.Audience,
+		Tone:           t.Tone,
+		TargetWords:    t.TargetWords,
+		ImageMode:      t.ImageMode,
+		ChartMode:      t.ChartMode,
+		PublishMode:    t.PublishMode,
+		PublishAt:      t.PublishAt,
+		Status:         t.Status,
+		Progress:       t.Progress,
+		CurrentStage:   t.CurrentStage,
+		ErrorMessage:   t.ErrorMessage,
+		ResultDraftID:  draftPublicID,
+		ArticleStyle:   t.ArticleStyle,
+		VisualEnhance:  t.VisualEnhance,
+		BrandProfileID: brandPublicID,
+		CreatedAt:      t.CreatedAt,
+		UpdatedAt:      t.UpdatedAt,
 	}
 }

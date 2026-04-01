@@ -61,6 +61,7 @@ func main() {
 	blockRepo := postgres.NewArticleBlockRepository(db)
 	sourceRepo := postgres.NewSourceDocumentRepository(db)
 	providerRepo := postgres.NewProviderConfigRepository(db)
+	brandRepo := postgres.NewBrandProfileRepository(db)
 
 	// Asynq client (for enqueuing next stages)
 	asynqClient := asynq.NewClient(asynq.RedisClientOpt{
@@ -76,7 +77,7 @@ func main() {
 	// Services
 	encSecret := viper.GetString("jwt.secret")
 	providerSvc := service.NewProviderConfigService(providerRepo, encSecret)
-	taskSvc := service.NewTaskService(taskRepo, draftRepo, ssePublisher, asynqClient)
+	taskSvc := service.NewTaskService(taskRepo, draftRepo, ssePublisher, asynqClient, brandRepo)
 
 	// LLM provider — dynamic from DB config with stub fallback
 	stubLLM := llm.NewStubLLMProvider(logger.L)
@@ -117,7 +118,11 @@ func main() {
 		_ = json.Unmarshal(searchCfg.ConfigJSON, &cfg)
 		if apiKey != "" && cfg.SearchEngineID != "" {
 			searchProvider = searchInteg.NewGoogleSearchProvider(apiKey, cfg.SearchEngineID, logger.L)
-			logger.L.Info("search provider: Google Custom Search")
+			keyPreview := apiKey
+			if len(keyPreview) > 8 {
+				keyPreview = keyPreview[:8] + "..."
+			}
+			log.Printf("[search] Google CSE: key_prefix=%s engine_id=%s", keyPreview, cfg.SearchEngineID)
 		}
 	}
 	if searchProvider == nil {

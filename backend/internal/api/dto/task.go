@@ -13,6 +13,9 @@ type CreateTaskRequest struct {
 	PublishMode     string     `json:"publish_mode" binding:"required,oneof=manual now schedule"`
 	PublishAt       *time.Time `json:"publish_at,omitempty"`
 	WechatAccountID *string    `json:"wechat_account_id,omitempty" binding:"omitempty,min=1,max=64"`
+	ArticleStyle    string     `json:"article_style" binding:"omitempty,oneof=minimal magazine listicle narrative faq casual"`
+	VisualEnhance   *bool      `json:"visual_enhance"`
+	BrandProfileID  *string    `json:"brand_profile_id,omitempty"`
 }
 
 // TaskVO is the view object for task display.
@@ -32,6 +35,9 @@ type TaskVO struct {
 	CurrentStage    string     `json:"current_stage"`
 	ErrorMessage    *string    `json:"error_message,omitempty"`
 	ResultDraftID   *string    `json:"result_draft_id,omitempty"`
+	ArticleStyle    string     `json:"article_style"`
+	VisualEnhance   bool       `json:"visual_enhance"`
+	BrandProfileID  *string    `json:"brand_profile_id,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 }

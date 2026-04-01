@@ -19,6 +19,9 @@ type ContentTask struct {
 	PublishMode     string     `gorm:"type:varchar(32);not null;default:'manual'" json:"publish_mode"`
 	PublishAt       *time.Time `gorm:"type:timestamptz" json:"publish_at,omitempty"`
 	WechatAccountID *int64     `gorm:"type:bigint;index" json:"wechat_account_id,omitempty"`
+	ArticleStyle    string     `gorm:"type:varchar(32)" json:"article_style"`
+	VisualEnhance   bool       `gorm:"type:bool;not null;default:false" json:"visual_enhance"`
+	BrandProfileID  *int64     `gorm:"type:bigint" json:"brand_profile_id,omitempty"`
 	Status          string     `gorm:"type:varchar(32);not null;default:'pending';index:idx_task_status_created,priority:1" json:"status"`
 	Progress        int        `gorm:"type:int;not null;default:0" json:"progress"`
 	CurrentStage    string     `gorm:"type:varchar(64)" json:"current_stage"`
@@ -80,3 +83,19 @@ const (
 	PublishModeNow      = "now"
 	PublishModeSchedule = "schedule"
 )
+
+// Article style constants.
+const (
+	StyleMinimal   = "minimal"
+	StyleMagazine  = "magazine"
+	StyleListicle  = "listicle"
+	StyleNarrative = "narrative"
+	StyleFAQ       = "faq"
+	StyleCasual    = "casual"
+)
+
+// ValidArticleStyles for validation.
+var ValidArticleStyles = map[string]bool{
+	StyleMinimal: true, StyleMagazine: true, StyleListicle: true,
+	StyleNarrative: true, StyleFAQ: true, StyleCasual: true,
+}

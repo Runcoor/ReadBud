@@ -172,7 +172,7 @@ func main() {
 		lazyImageGen := integration.NewLazyImageGenProvider(providerFactory, stubImageGen)
 		_ = lazyImageGen // available for future injection
 		wechatSvc := service.NewWechatAccountService(wechatRepo, encSecret)
-		taskSvc := service.NewTaskService(taskRepo, draftRepo, sseHub, asynqClient)
+		taskSvc := service.NewTaskService(taskRepo, draftRepo, sseHub, asynqClient, brandRepo)
 		draftSvc := service.NewDraftService(draftRepo, blockRepo, sourceRepo, taskRepo)
 		contentImageSvc := service.NewContentImageService(assetRepo, stubPublisher, stubStorage, stubTokenProv, logger.L)
 		publishSvc := service.NewPublishService(publishJobRepo, publishRecordRepo, stubPublisher, stubTokenProv, contentImageSvc, logger.L)
