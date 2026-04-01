@@ -24,6 +24,10 @@ type ArticleDraft struct {
 	RiskLevel        string         `gorm:"type:varchar(32);not null;default:'low'" json:"risk_level"`
 	ReviewStatus     string         `gorm:"type:varchar(32);not null;default:'pending'" json:"review_status"`
 	Version          int            `gorm:"type:int;not null;default:1;index:idx_draft_task_version,priority:2,sort:desc" json:"version"`
+	StyleUsed        string         `gorm:"type:varchar(32)" json:"style_used"`
+	OpeningType      string         `gorm:"type:varchar(32)" json:"opening_type"`
+	TitlePattern     string         `gorm:"type:varchar(32)" json:"title_pattern"`
+	CTAType          string         `gorm:"type:varchar(32)" json:"cta_type"`
 }
 
 // TableName overrides the default table name.

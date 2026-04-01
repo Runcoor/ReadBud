@@ -17,6 +17,7 @@ type ArticleDraftRepository interface {
 	FindByTaskID(ctx context.Context, taskID int64) ([]draft.ArticleDraft, error)
 	FindLatestByTaskID(ctx context.Context, taskID int64) (*draft.ArticleDraft, error)
 	Update(ctx context.Context, d *draft.ArticleDraft) error
+	FindRecentFingerprints(ctx context.Context, limit int, brandProfileID *int64) ([]draft.ArticleDraft, error)
 }
 
 // ArticleBlockRepository defines the interface for article block data access.
@@ -94,6 +95,25 @@ func (r *draftRepo) Update(ctx context.Context, d *draft.ArticleDraft) error {
 		return fmt.Errorf("draftRepo.Update: %w", err)
 	}
 	return nil
+}
+
+func (r *draftRepo) FindRecentFingerprints(ctx context.Context, limit int, brandProfileID *int64) ([]draft.ArticleDraft, error) {
+	var drafts []draft.ArticleDraft
+	query := r.db.WithContext(ctx).
+		Select("style_used, opening_type, title_pattern, cta_type").
+		Where("style_used != ''").
+		Order("created_at DESC").
+		Limit(limit)
+
+	if brandProfileID != nil {
+		query = query.Joins("JOIN content_tasks ON content_tasks.result_draft_id = article_drafts.id").
+			Where("content_tasks.brand_profile_id = ?", *brandProfileID)
+	}
+
+	if err := query.Find(&drafts).Error; err != nil {
+		return nil, fmt.Errorf("draftRepo.FindRecentFingerprints: %w", err)
+	}
+	return drafts, nil
 }
 
 // --- ArticleBlock repo impl ---
