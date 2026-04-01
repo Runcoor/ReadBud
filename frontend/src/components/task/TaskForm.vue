@@ -39,6 +39,17 @@
         </el-select>
       </el-form-item>
 
+      <el-form-item label="文章风格">
+        <el-select v-model="form.article_style" placeholder="自动推荐（留空由AI选择）" class="w-full" clearable>
+          <el-option
+            v-for="(label, key) in ARTICLE_STYLE_LABELS"
+            :key="key"
+            :label="label"
+            :value="key"
+          />
+        </el-select>
+      </el-form-item>
+
       <el-form-item label="目标字数" prop="target_words">
         <el-slider
           v-model="form.target_words"
@@ -75,6 +86,25 @@
           active-text="自动生成"
           inactive-text="不需要"
         />
+      </el-form-item>
+
+      <el-form-item label="视觉增强">
+        <el-switch
+          v-model="form.visual_enhance"
+          active-text="AI排版美化"
+          inactive-text="预设模板"
+        />
+      </el-form-item>
+
+      <el-form-item v-if="brandProfiles.length > 0" label="品牌档案">
+        <el-select v-model="form.brand_profile_id" placeholder="默认品牌" class="w-full" clearable>
+          <el-option
+            v-for="bp in brandProfiles"
+            :key="bp.id"
+            :label="bp.name"
+            :value="bp.id"
+          />
+        </el-select>
       </el-form-item>
     </div>
 
@@ -125,10 +155,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import type { CreateTaskRequest, ImageMode, PublishMode } from '@/types/task'
-import { IMAGE_MODE_LABELS, PUBLISH_MODE_LABELS } from '@/types/task'
+import type { CreateTaskRequest, ImageMode, PublishMode, ArticleStyle } from '@/types/task'
+import { IMAGE_MODE_LABELS, PUBLISH_MODE_LABELS, ARTICLE_STYLE_LABELS } from '@/types/task'
+import { listBrandProfiles } from '@/api/brand'
+import type { BrandProfileVO } from '@/types/brand'
 
 interface Props {
   disabled?: boolean
@@ -154,9 +186,23 @@ const form = reactive({
   image_mode: 'auto' as ImageMode,
   publish_mode: 'manual' as PublishMode,
   publish_at: undefined as string | undefined,
+  article_style: '' as ArticleStyle | '',
+  visual_enhance: false,
+  brand_profile_id: '' as string,
 })
 
 const chartEnabled = ref(true)
+
+const brandProfiles = ref<BrandProfileVO[]>([])
+
+onMounted(async () => {
+  try {
+    const res = await listBrandProfiles()
+    brandProfiles.value = res.data || []
+  } catch {
+    // ignore - brand profiles are optional
+  }
+})
 
 const toneOptions = [
   { value: 'professional', label: '专业严谨' },
@@ -221,6 +267,9 @@ async function handleSubmit(): Promise<void> {
     chart_mode: chartEnabled.value ? 1 : 0,
     publish_mode: form.publish_mode,
     publish_at: form.publish_mode === 'schedule' ? form.publish_at : undefined,
+    article_style: form.article_style || undefined,
+    visual_enhance: form.visual_enhance,
+    brand_profile_id: form.brand_profile_id || undefined,
   }
 
   emit('submit', payload)

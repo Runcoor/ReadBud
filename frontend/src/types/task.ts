@@ -23,6 +23,8 @@ export type ImageMode = 'auto' | 'search_only' | 'generate_only'
 
 export type PublishMode = 'manual' | 'now' | 'schedule'
 
+export type ArticleStyle = 'minimal' | 'magazine' | 'listicle' | 'narrative' | 'faq' | 'casual'
+
 export interface CreateTaskRequest {
   keyword: string
   audience?: string
@@ -33,6 +35,9 @@ export interface CreateTaskRequest {
   publish_mode: PublishMode
   publish_at?: string
   wechat_account_id?: string
+  article_style?: ArticleStyle
+  visual_enhance?: boolean
+  brand_profile_id?: string
 }
 
 export interface TaskVO {
@@ -46,6 +51,9 @@ export interface TaskVO {
   chart_mode: number
   publish_mode: PublishMode
   publish_at?: string
+  article_style: string
+  visual_enhance: boolean
+  brand_profile_id?: string
   status: TaskStatus
   progress: number
   current_stage: string
@@ -112,4 +120,13 @@ export const PUBLISH_MODE_LABELS: Record<PublishMode, string> = {
   manual: '手动发布',
   now: '立即发布',
   schedule: '定时发布',
+}
+
+export const ARTICLE_STYLE_LABELS: Record<ArticleStyle, string> = {
+  minimal: '极简专业',
+  magazine: '杂志编辑',
+  listicle: '清单干货',
+  narrative: '叙事故事',
+  faq: '问答拆解',
+  casual: '轻社交',
 }
