@@ -137,17 +137,9 @@ func (s *ContentImageService) UploadForDraft(ctx context.Context, draftID int64,
 
 // uploadSingleAsset downloads image data from storage and uploads it to WeChat.
 func (s *ContentImageService) uploadSingleAsset(ctx context.Context, a *asset.Asset, token string) (*ContentImageUploadResult, error) {
-	// Get the storage URL for fetching image data
-	storageURL, err := s.storage.GetURL(ctx, a.Bucket, a.ObjectKey)
-	if err != nil {
-		return nil, fmt.Errorf("get storage URL: %w", err)
-	}
-
-	// For stub: use empty placeholder data since storage may not be real
-	// In production, this would download from the storage URL
 	imageData, err := s.fetchImageData(ctx, a)
 	if err != nil {
-		return nil, fmt.Errorf("fetch image data from %s: %w", storageURL, err)
+		return nil, fmt.Errorf("uploadSingleAsset: fetch image data: %w", err)
 	}
 
 	// Validate image meets WeChat requirements
@@ -183,27 +175,12 @@ func (s *ContentImageService) uploadSingleAsset(ctx context.Context, a *asset.As
 }
 
 // fetchImageData retrieves image bytes from storage.
-// In development with stub storage, returns minimal placeholder data.
 func (s *ContentImageService) fetchImageData(ctx context.Context, a *asset.Asset) ([]byte, error) {
-	url, err := s.storage.GetURL(ctx, a.Bucket, a.ObjectKey)
+	data, err := s.storage.Download(ctx, a.Bucket, a.ObjectKey)
 	if err != nil {
-		return nil, fmt.Errorf("fetchImageData: get URL: %w", err)
+		return nil, fmt.Errorf("fetchImageData: download: %w", err)
 	}
-
-	// If storage returns a real URL, we would HTTP GET it here.
-	// For now, return a minimal valid PNG for stub/dev mode.
-	_ = url
-	if a.SizeBytes != nil && *a.SizeBytes > 0 {
-		// Placeholder: in production, download from storage URL
-		placeholder := make([]byte, 128)
-		// Minimal PNG header for validation
-		copy(placeholder, []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A})
-		return placeholder, nil
-	}
-
-	// Minimal valid PNG
-	placeholder := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
-	return placeholder, nil
+	return data, nil
 }
 
 // ReplaceImageURLsInHTML replaces original image URLs in compiled HTML with WeChat URLs.
