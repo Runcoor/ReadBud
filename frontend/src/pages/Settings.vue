@@ -279,6 +279,7 @@
                     <div class="select-wrapper">
                       <select v-model="formFields.search_provider" class="mono-select">
                         <option value="google_custom">Google Custom Search</option>
+                        <option value="tavily">Tavily Search</option>
                         <option value="serpapi">SerpAPI</option>
                         <option value="bing">Bing Search</option>
                       </select>
@@ -299,6 +300,18 @@
                         </button>
                       </div>
                       <span class="form-hint">在 Google Cloud Console → APIs & Services → Credentials 获取</span>
+                    </div>
+                  </template>
+                  <template v-else-if="formFields.search_provider === 'tavily'">
+                    <div class="form-group">
+                      <label class="form-label">API Key</label>
+                      <div class="input-with-toggle">
+                        <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" placeholder="tvly-xxxx" />
+                        <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                        </button>
+                      </div>
+                      <span class="form-hint">在 https://app.tavily.com 注册获取，免费 1000 次/月</span>
                     </div>
                   </template>
                   <template v-else-if="formFields.search_provider === 'serpapi'">
@@ -350,38 +363,6 @@
                     <span v-if="formFields.image_search_provider === 'unsplash'" class="form-hint">在 https://unsplash.com/developers 注册应用获取</span>
                     <span v-else-if="formFields.image_search_provider === 'pexels'" class="form-hint">在 https://www.pexels.com/api/ 注册获取</span>
                     <span v-else class="form-hint">在 Azure Portal → Bing Image Search 获取</span>
-                  </div>
-                </template>
-
-                <!-- Storage fields -->
-                <template v-else-if="newProviderType === 'storage'">
-                  <div class="form-group">
-                    <label class="form-label">存储服务地址</label>
-                    <input v-model="formFields.storage_endpoint" class="mono-input" placeholder="例如：s3.amazonaws.com 或 localhost:9000" />
-                    <span class="form-hint">S3 兼容接口地址（MinIO、阿里云 OSS、腾讯 COS 等）</span>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Bucket 名称</label>
-                    <input v-model="formFields.storage_bucket" class="mono-input" placeholder="readbud" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Access Key</label>
-                    <input v-model="formFields.storage_access_key" class="mono-input" placeholder="Access Key ID" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Secret Key</label>
-                    <div class="input-with-toggle">
-                      <input v-model="formFields.storage_secret_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" placeholder="Secret Access Key" />
-                      <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">
-                      <input type="checkbox" v-model="formFields.storage_use_ssl" class="mono-checkbox" />
-                      启用 SSL（HTTPS）
-                    </label>
                   </div>
                 </template>
 
@@ -631,37 +612,6 @@
                 </div>
               </template>
 
-              <!-- Storage fields (edit) -->
-              <template v-else-if="editingProvider.provider_type === 'storage'">
-                <div class="form-group">
-                  <label class="form-label">存储服务地址</label>
-                  <input v-model="formFields.storage_endpoint" class="mono-input" placeholder="s3.amazonaws.com 或 localhost:9000" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Bucket 名称</label>
-                  <input v-model="formFields.storage_bucket" class="mono-input" placeholder="readbud" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Access Key</label>
-                  <input v-model="formFields.storage_access_key" class="mono-input" placeholder="Access Key ID" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Secret Key</label>
-                  <div class="input-with-toggle">
-                    <input v-model="formFields.storage_secret_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" :placeholder="editingProvider.has_secret ? '已配置（留空保持不变）' : 'Secret Access Key'" />
-                    <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                    </button>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">
-                    <input type="checkbox" v-model="formFields.storage_use_ssl" class="mono-checkbox" />
-                    启用 SSL（HTTPS）
-                  </label>
-                </div>
-              </template>
-
               <!-- Crawler fields (edit) -->
               <template v-else-if="editingProvider.provider_type === 'crawler'">
                 <div class="form-group">
@@ -896,12 +846,6 @@ interface FormFields {
   search_provider: string  // 'google_custom' | 'serpapi' | 'bing'
   // Image search
   image_search_provider: string  // 'unsplash' | 'pexels' | 'bing'
-  // Storage
-  storage_endpoint: string
-  storage_bucket: string
-  storage_access_key: string
-  storage_secret_key: string
-  storage_use_ssl: boolean
   // Crawler
   crawler_provider: string  // 'jina' | 'firecrawl' | 'custom'
   crawler_timeout: number | null
@@ -916,11 +860,6 @@ const formFields = reactive<FormFields>({
   search_engine_id: '',
   search_provider: 'google_custom',
   image_search_provider: 'unsplash',
-  storage_endpoint: '',
-  storage_bucket: '',
-  storage_access_key: '',
-  storage_secret_key: '',
-  storage_use_ssl: false,
   crawler_provider: 'jina',
   crawler_timeout: null,
   temperature: 0.7,
@@ -946,11 +885,6 @@ function resetFormFields() {
   formFields.search_engine_id = ''
   formFields.search_provider = 'google_custom'
   formFields.image_search_provider = 'unsplash'
-  formFields.storage_endpoint = ''
-  formFields.storage_bucket = ''
-  formFields.storage_access_key = ''
-  formFields.storage_secret_key = ''
-  formFields.storage_use_ssl = false
   formFields.crawler_provider = 'jina'
   formFields.crawler_timeout = null
   showApiKey.value = false
@@ -974,11 +908,6 @@ function populateFormFromProvider(p: ProviderConfigVO) {
   formFields.search_engine_id = (cfg.search_engine_id as string) || ''
   // Image search
   formFields.image_search_provider = (cfg.image_search_provider as string) || 'unsplash'
-  // Storage
-  formFields.storage_endpoint = (cfg.endpoint as string) || ''
-  formFields.storage_bucket = (cfg.bucket as string) || ''
-  formFields.storage_access_key = (cfg.access_key as string) || ''
-  formFields.storage_use_ssl = (cfg.use_ssl as boolean) || false
   // Crawler
   formFields.crawler_provider = (cfg.crawler_provider as string) || 'jina'
   formFields.crawler_timeout = (cfg.timeout as number) || null
@@ -1014,10 +943,6 @@ function buildConfigJson(providerType: string): Record<string, unknown> {
   } else if (providerType === 'image_search') {
     cfg.image_search_provider = formFields.image_search_provider
     if (formFields.base_url) cfg.base_url = formFields.base_url
-  } else if (providerType === 'storage') {
-    if (formFields.storage_endpoint) cfg.endpoint = formFields.storage_endpoint
-    if (formFields.storage_bucket) cfg.bucket = formFields.storage_bucket
-    cfg.use_ssl = formFields.storage_use_ssl
   } else if (providerType === 'crawler') {
     cfg.crawler_provider = formFields.crawler_provider
     if (formFields.base_url) cfg.base_url = formFields.base_url
@@ -1029,15 +954,6 @@ function buildConfigJson(providerType: string): Record<string, unknown> {
 
 // Build secret_json based on provider type
 function buildSecretJson(providerType: string): string | undefined {
-  if (providerType === 'storage') {
-    if (formFields.storage_access_key || formFields.storage_secret_key) {
-      return JSON.stringify({
-        access_key: formFields.storage_access_key,
-        secret_key: formFields.storage_secret_key,
-      })
-    }
-    return undefined
-  }
   return formFields.api_key || undefined
 }
 

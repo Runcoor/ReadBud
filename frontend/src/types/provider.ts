@@ -1,5 +1,5 @@
 /** Provider type options */
-export type ProviderType = 'llm' | 'image_search' | 'image_gen' | 'search' | 'storage' | 'crawler'
+export type ProviderType = 'llm' | 'image_search' | 'image_gen' | 'search' | 'crawler'
 
 /** Provider type label map */
 export const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
@@ -7,7 +7,6 @@ export const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
   image_search: '图片搜索',
   image_gen: '图片生成',
   search: '内容搜索',
-  storage: '对象存储',
   crawler: '网页抓取',
 }
 
@@ -19,6 +18,7 @@ export interface ProviderConfigVO {
   config_json: Record<string, unknown>
   has_secret: boolean
   status: number
+  is_default: boolean
 }
 
 /** Provider config request */
