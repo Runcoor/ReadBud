@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -9,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -810,8 +810,7 @@ func (s *Server) persistImageAsAsset(
 	}
 
 	now := time.Now().UTC()
-	entropy := ulid.Monotonic(rand.New(rand.NewSource(now.UnixNano())), 0)
-	id := ulid.MustNew(ulid.Timestamp(now), entropy).String()
+	id := ulid.MustNew(ulid.Timestamp(now), crand.Reader).String()
 	key := fmt.Sprintf("%04d%02d/%s.%s", now.Year(), now.Month(), id, ext)
 
 	publicURL, err := s.storage.Upload(ctx, bucket, key, data, mime)
@@ -843,6 +842,9 @@ func (s *Server) persistImageAsAsset(
 		WechatUploadStatus: asset.WechatUploadPending,
 	}
 	if err := s.assetRepo.Create(ctx, a); err != nil {
+		// Best-effort rollback: remove the orphan file. Use Background context
+		// because the original ctx may already be cancelled.
+		_ = s.storage.Delete(context.Background(), bucket, key)
 		return "", 0, fmt.Errorf("persistImageAsAsset: create asset: %w", err)
 	}
 	return publicURL, a.ID, nil
