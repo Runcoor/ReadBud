@@ -875,6 +875,22 @@ func (s *Server) generateImageWithAsset(ctx context.Context, prompt string) (*ma
 		}
 		data = decoded
 	case gen.URL != "":
+		// Some OpenAI-compatible relays return the image inline as a data URL
+		// instead of a public https:// URL. Detect and decode that case.
+		if strings.HasPrefix(gen.URL, "data:") {
+			raw := gen.URL
+			if i := strings.Index(raw, ","); i >= 0 && strings.Contains(raw[:i], "base64") {
+				raw = raw[i+1:]
+			} else {
+				return nil, fmt.Errorf("generateImageWithAsset: data URL not base64-encoded")
+			}
+			decoded, decErr := base64.StdEncoding.DecodeString(raw)
+			if decErr != nil {
+				return nil, fmt.Errorf("generateImageWithAsset: decode data URL: %w", decErr)
+			}
+			data = decoded
+			break
+		}
 		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, gen.URL, nil)
 		if reqErr != nil {
 			return nil, fmt.Errorf("generateImageWithAsset: build request: %w", reqErr)
