@@ -120,10 +120,10 @@ type ImageGenOptions struct {
 
 // ChartData represents data for chart generation.
 type ChartData struct {
-	Type    string      `json:"type"` // "bar", "line", "pie", etc.
-	Title   string      `json:"title"`
-	Labels  []string    `json:"labels"`
-	Datasets []Dataset  `json:"datasets"`
+	Type     string    `json:"type"` // "bar", "line", "pie", etc.
+	Title    string    `json:"title"`
+	Labels   []string  `json:"labels"`
+	Datasets []Dataset `json:"datasets"`
 }
 
 // Dataset represents a single data series in a chart.
@@ -140,7 +140,7 @@ type ChartProvider interface {
 
 // ---------- Storage Provider ----------
 
-// StorageProvider abstracts object storage (MinIO, S3, etc.).
+// StorageProvider abstracts object storage (local FS, S3, etc.).
 type StorageProvider interface {
 	// Upload stores data and returns the object URL.
 	Upload(ctx context.Context, bucket, key string, data []byte, contentType string) (string, error)
@@ -154,12 +154,12 @@ type StorageProvider interface {
 
 // WeChatArticle represents an article ready for WeChat publishing.
 type WeChatArticle struct {
-	Title      string `json:"title"`
-	Author     string `json:"author"`
-	Content    string `json:"content"`     // WeChat-compatible HTML
-	Digest     string `json:"digest"`      // Summary for card display
-	ThumbURL   string `json:"thumb_url"`   // Cover image URL
-	SourceURL  string `json:"source_url"`  // "Read original" link
+	Title     string `json:"title"`
+	Author    string `json:"author"`
+	Content   string `json:"content"`    // WeChat-compatible HTML
+	Digest    string `json:"digest"`     // Summary for card display
+	ThumbURL  string `json:"thumb_url"`  // Cover image URL
+	SourceURL string `json:"source_url"` // "Read original" link
 }
 
 // Content image upload constraints per WeChat API specification.

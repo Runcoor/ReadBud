@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -23,7 +22,7 @@ func NewStubStorageProvider(logger *zap.Logger) *StubStorageProvider {
 
 // Upload simulates storing data and returns a stub URL.
 func (s *StubStorageProvider) Upload(ctx context.Context, bucket, key string, data []byte, contentType string) (string, error) {
-	url := fmt.Sprintf("http://localhost:9000/%s/%s", bucket, key)
+	url := fmt.Sprintf("/static/images/%s/%s", bucket, key)
 	s.logger.Info("stub: uploaded object",
 		zap.String("bucket", bucket),
 		zap.String("key", key),
@@ -35,7 +34,7 @@ func (s *StubStorageProvider) Upload(ctx context.Context, bucket, key string, da
 
 // GetURL returns a stub presigned URL for the given object.
 func (s *StubStorageProvider) GetURL(ctx context.Context, bucket, key string) (string, error) {
-	url := fmt.Sprintf("http://localhost:9000/%s/%s?token=stub_%d", bucket, key, time.Now().Unix())
+	url := fmt.Sprintf("/static/images/%s/%s", bucket, key)
 	return url, nil
 }
 
