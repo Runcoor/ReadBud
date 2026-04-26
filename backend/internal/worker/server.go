@@ -794,7 +794,10 @@ func (s *Server) generateAndStoreImage(ctx context.Context, prompt string) (stri
 		}
 		data = decoded
 	case gen.URL != "":
-		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, gen.URL, nil)
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, gen.URL, nil)
+		if reqErr != nil {
+			return "", fmt.Errorf("generateAndStoreImage: build request: %w", reqErr)
+		}
 		client := &http.Client{Timeout: 30 * time.Second}
 		resp, getErr := client.Do(req)
 		if getErr != nil {
@@ -915,7 +918,12 @@ func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 			}
 			newHtml := imgTag + existing
 			blocks[i].HTMLFragment = &newHtml
-			s.blockRepo.Update(ctx, &blocks[i])
+			if err := s.blockRepo.Update(ctx, &blocks[i]); err != nil {
+				s.logger.Warn("image match: block update failed",
+					zap.Error(err),
+					zap.Int64("block_id", blocks[i].ID),
+				)
+			}
 
 			imgIdx++
 			if imgIdx >= maxImages {
