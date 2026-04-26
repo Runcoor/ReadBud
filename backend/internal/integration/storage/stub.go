@@ -38,6 +38,16 @@ func (s *StubStorageProvider) GetURL(ctx context.Context, bucket, key string) (s
 	return url, nil
 }
 
+// Download returns a minimal placeholder PNG header so callers can exercise
+// the byte-handling code path without a real backing store.
+func (s *StubStorageProvider) Download(ctx context.Context, bucket, key string) ([]byte, error) {
+	s.logger.Info("stub: downloaded object",
+		zap.String("bucket", bucket),
+		zap.String("key", key),
+	)
+	return []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}, nil
+}
+
 // Delete simulates deleting an object.
 func (s *StubStorageProvider) Delete(ctx context.Context, bucket, key string) error {
 	s.logger.Info("stub: deleted object",

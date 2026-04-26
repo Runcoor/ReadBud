@@ -144,6 +144,9 @@ type ChartProvider interface {
 type StorageProvider interface {
 	// Upload stores data and returns the object URL.
 	Upload(ctx context.Context, bucket, key string, data []byte, contentType string) (string, error)
+	// Download retrieves the bytes for a previously uploaded object.
+	// Returns an error wrapping os.ErrNotExist when the object is missing.
+	Download(ctx context.Context, bucket, key string) ([]byte, error)
 	// GetURL returns a presigned URL for the given object.
 	GetURL(ctx context.Context, bucket, key string) (string, error)
 	// Delete removes an object.

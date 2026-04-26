@@ -128,6 +128,21 @@ func (s *LocalStorageProvider) GetURL(ctx context.Context, bucket, key string) (
 	return s.publicURL(bucket, key), nil
 }
 
+// Download returns the bytes for the object at <rootDir>/<bucket>/<key>.
+// Wraps os.ErrNotExist when the object is missing so callers can
+// distinguish missing-file from other failures via errors.Is.
+func (s *LocalStorageProvider) Download(ctx context.Context, bucket, key string) ([]byte, error) {
+	p, err := s.absPath(bucket, key)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return nil, fmt.Errorf("localStorage.Download: %w", err)
+	}
+	return data, nil
+}
+
 // Delete removes the object. A missing file is not treated as an error and produces no log line.
 func (s *LocalStorageProvider) Delete(ctx context.Context, bucket, key string) error {
 	p, err := s.absPath(bucket, key)

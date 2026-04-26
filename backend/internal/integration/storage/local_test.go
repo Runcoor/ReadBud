@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -115,4 +116,45 @@ func TestLocalStorage_DeleteMissingDoesNotLog(t *testing.T) {
 // helper for log assertions
 func zapObserver() (zapcore.Core, *observer.ObservedLogs) {
 	return observer.New(zapcore.InfoLevel)
+}
+
+func TestLocalStorage_DownloadRoundTrip(t *testing.T) {
+	tmp := t.TempDir()
+	p := NewLocalStorageProvider(tmp, "/static/images", zap.NewNop())
+
+	want := []byte("hello world")
+	if _, err := p.Upload(context.Background(), "generated", "202604/abc.png", want, "image/png"); err != nil {
+		t.Fatalf("Upload failed: %v", err)
+	}
+
+	got, err := p.Download(context.Background(), "generated", "202604/abc.png")
+	if err != nil {
+		t.Fatalf("Download failed: %v", err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("Download mismatch: got %q want %q", got, want)
+	}
+}
+
+func TestLocalStorage_DownloadMissingReturnsNotExist(t *testing.T) {
+	tmp := t.TempDir()
+	p := NewLocalStorageProvider(tmp, "/static/images", zap.NewNop())
+
+	_, err := p.Download(context.Background(), "generated", "missing.png")
+	if err == nil {
+		t.Fatalf("expected error for missing file")
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected error to wrap os.ErrNotExist, got %v", err)
+	}
+}
+
+func TestLocalStorage_DownloadRejectsTraversal(t *testing.T) {
+	tmp := t.TempDir()
+	p := NewLocalStorageProvider(tmp, "/static/images", zap.NewNop())
+
+	_, err := p.Download(context.Background(), "generated", "../escape.png")
+	if err == nil {
+		t.Fatalf("expected path traversal to be rejected")
+	}
 }
