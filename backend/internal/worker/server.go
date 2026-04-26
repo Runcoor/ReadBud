@@ -856,14 +856,19 @@ func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 	const maxImages = 2
 	urls := make([]string, 0, maxImages)
 
-	// 1. generate_only or auto: try generation first
+	// 1. generate_only or auto: try generation first.
+	// In generate_only we continue past failures (user opted out of fallback);
+	// in auto we break early so Pexels fallback can take over quickly.
 	if mode == taskDomain.ImageModeGenerateOnly || mode == taskDomain.ImageModeAuto {
 		for i := 0; i < maxImages; i++ {
 			prompt := fmt.Sprintf("editorial illustration about %s, clean magazine style, high quality", task.Keyword)
 			localURL, genErr := s.generateAndStoreImage(ctx, prompt)
 			if genErr != nil {
 				s.logger.Warn("image match: generate failed", zap.Error(genErr), zap.Int("idx", i))
-				break
+				if mode == taskDomain.ImageModeAuto {
+					break
+				}
+				continue
 			}
 			urls = append(urls, localURL)
 		}
