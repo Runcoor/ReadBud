@@ -2,13 +2,18 @@ package worker
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"math/rand"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/oklog/ulid/v2"
 	"go.uber.org/zap"
 
 	"readbud/internal/adapter"
@@ -762,6 +767,64 @@ func (s *Server) handleArticleWrite(ctx context.Context, t *asynq.Task) error {
 	return s.enqueueNext(pipeline.TypeImageMatch, *p)
 }
 
+// generateAndStoreImage runs imageGen, fetches/decodes the bytes,
+// uploads to storage, and returns a local URL. Returns error on any failure
+// so callers can fall back to alternative image sources.
+func (s *Server) generateAndStoreImage(ctx context.Context, prompt string) (string, error) {
+	gen, err := s.imageGen.Generate(ctx, prompt, adapter.ImageGenOptions{
+		Width:  1024,
+		Height: 768,
+		Style:  "professional",
+	})
+	if err != nil {
+		return "", fmt.Errorf("generateAndStoreImage: gen: %w", err)
+	}
+
+	var data []byte
+	switch {
+	case gen.Base64 != "":
+		raw := gen.Base64
+		// Strip optional data-URL prefix like "data:image/png;base64,"
+		if i := strings.Index(raw, ","); i >= 0 && strings.Contains(raw[:i], "base64") {
+			raw = raw[i+1:]
+		}
+		decoded, decErr := base64.StdEncoding.DecodeString(raw)
+		if decErr != nil {
+			return "", fmt.Errorf("generateAndStoreImage: decode base64: %w", decErr)
+		}
+		data = decoded
+	case gen.URL != "":
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, gen.URL, nil)
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, getErr := client.Do(req)
+		if getErr != nil {
+			return "", fmt.Errorf("generateAndStoreImage: download: %w", getErr)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			return "", fmt.Errorf("generateAndStoreImage: download status %d", resp.StatusCode)
+		}
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 20*1024*1024))
+		if readErr != nil {
+			return "", fmt.Errorf("generateAndStoreImage: read body: %w", readErr)
+		}
+		data = body
+	default:
+		return "", fmt.Errorf("generateAndStoreImage: empty result (no URL, no base64)")
+	}
+
+	now := time.Now().UTC()
+	entropy := ulid.Monotonic(rand.New(rand.NewSource(now.UnixNano())), 0)
+	id := ulid.MustNew(ulid.Timestamp(now), entropy).String()
+	key := fmt.Sprintf("%04d%02d/%s.png", now.Year(), now.Month(), id)
+
+	url, upErr := s.storage.Upload(ctx, "generated", key, data, "image/png")
+	if upErr != nil {
+		return "", fmt.Errorf("generateAndStoreImage: upload: %w", upErr)
+	}
+	return url, nil
+}
+
 func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 	p, err := pipeline.ParsePayload(t)
 	if err != nil {
@@ -773,54 +836,78 @@ func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	// Get the task to find the keyword for image search
 	task, err := s.taskSvc.GetByID(ctx, p.TaskID)
 	if err != nil || task == nil {
 		s.logger.Warn("image match: task not found, skipping", zap.Int64("task_id", p.TaskID))
 		return s.enqueueNext(pipeline.TypeChartGen, *p)
 	}
-
-	// Translate keyword to English for better Pexels results
-	searchQuery := task.Keyword
-	engQuery, engErr := s.callLLM(ctx,
-		"Translate the following keyword to a short English search phrase suitable for stock photo search. Return ONLY the English phrase, nothing else.",
-		task.Keyword,
-		50,
-	)
-	if engErr == nil && len(engQuery) > 0 && len(engQuery) < 100 {
-		searchQuery = engQuery
-		s.logger.Info("image match: translated query", zap.String("original", task.Keyword), zap.String("english", searchQuery))
-	}
-
-	// Search for images
-	imgSvc := pipelinePkg.NewImageService(s.imageSearch, s.imageGen)
-	results, err := imgSvc.SearchAndMatch(ctx, searchQuery, 3)
-	if err != nil {
-		s.logger.Warn("image match: search failed, continuing without images", zap.Error(err))
-		return s.enqueueNext(pipeline.TypeChartGen, *p)
-	}
-
-	if len(results) == 0 {
-		s.logger.Info("image match: no images found")
-		return s.enqueueNext(pipeline.TypeChartGen, *p)
-	}
-
-	// Get the draft and its blocks
 	if task.ResultDraftID == nil {
 		return s.enqueueNext(pipeline.TypeChartGen, *p)
 	}
 
+	mode := task.ImageMode
+	if mode == "" {
+		mode = taskDomain.ImageModeAuto
+	}
+
+	const maxImages = 2
+	urls := make([]string, 0, maxImages)
+
+	// 1. generate_only or auto: try generation first
+	if mode == taskDomain.ImageModeGenerateOnly || mode == taskDomain.ImageModeAuto {
+		for i := 0; i < maxImages; i++ {
+			prompt := fmt.Sprintf("editorial illustration about %s, clean magazine style, high quality", task.Keyword)
+			localURL, genErr := s.generateAndStoreImage(ctx, prompt)
+			if genErr != nil {
+				s.logger.Warn("image match: generate failed", zap.Error(genErr), zap.Int("idx", i))
+				break
+			}
+			urls = append(urls, localURL)
+		}
+	}
+
+	// 2. search_only, or auto with insufficient generated, fall back to Pexels
+	needPexels := (mode == taskDomain.ImageModeSearchOnly) ||
+		(mode == taskDomain.ImageModeAuto && len(urls) < maxImages)
+	if needPexels {
+		searchQuery := task.Keyword
+		engQuery, engErr := s.callLLM(ctx,
+			"Translate the following keyword to a short English search phrase suitable for stock photo search. Return ONLY the English phrase, nothing else.",
+			task.Keyword,
+			50,
+		)
+		if engErr == nil && len(engQuery) > 0 && len(engQuery) < 100 {
+			searchQuery = engQuery
+		}
+		imgSvc := pipelinePkg.NewImageService(s.imageSearch, s.imageGen)
+		results, searchErr := imgSvc.SearchAndMatch(ctx, searchQuery, maxImages)
+		if searchErr != nil {
+			s.logger.Warn("image match: search failed", zap.Error(searchErr))
+		}
+		for _, r := range results {
+			if len(urls) >= maxImages {
+				break
+			}
+			urls = append(urls, r.URL)
+		}
+	}
+
+	if len(urls) == 0 {
+		s.logger.Info("image match: no images obtained, continuing")
+		return s.enqueueNext(pipeline.TypeChartGen, *p)
+	}
+
+	// 3. Embed URLs into draft section blocks
 	blocks, err := s.blockRepo.FindByDraftID(ctx, *task.ResultDraftID)
 	if err != nil || len(blocks) == 0 {
 		return s.enqueueNext(pipeline.TypeChartGen, *p)
 	}
 
-	// Assign images to section blocks
 	imgIdx := 0
 	for i, block := range blocks {
-		if block.BlockType == "section" && imgIdx < len(results) {
-			imgTag := fmt.Sprintf(`<figure style="margin:20px 0;text-align:center"><img src="%s" alt="%s" style="width:100%%;max-width:100%%;border-radius:12px;display:block" /><figcaption style="font-size:12px;color:#999;margin-top:8px">图片来源: Pexels</figcaption></figure>`,
-				results[imgIdx].URL, task.Keyword)
+		if block.BlockType == "section" && imgIdx < len(urls) {
+			imgTag := fmt.Sprintf(`<figure style="margin:20px 0;text-align:center"><img src="%s" alt="%s" style="width:100%%;max-width:100%%;border-radius:12px;display:block" /></figure>`,
+				urls[imgIdx], task.Keyword)
 
 			existing := ""
 			if block.HTMLFragment != nil {
@@ -831,13 +918,16 @@ func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 			s.blockRepo.Update(ctx, &blocks[i])
 
 			imgIdx++
-			if imgIdx >= 2 { // Max 2 images per article
+			if imgIdx >= maxImages {
 				break
 			}
 		}
 	}
 
-	s.logger.Info("image match: assigned images", zap.Int("count", imgIdx))
+	s.logger.Info("image match: assigned images",
+		zap.Int("count", imgIdx),
+		zap.String("mode", mode),
+	)
 	return s.enqueueNext(pipeline.TypeChartGen, *p)
 }
 
