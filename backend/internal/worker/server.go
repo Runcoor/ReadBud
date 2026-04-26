@@ -2,7 +2,9 @@ package worker
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +20,7 @@ import (
 
 	"readbud/internal/adapter"
 	"readbud/internal/domain"
+	"readbud/internal/domain/asset"
 	"readbud/internal/domain/draft"
 	"readbud/internal/domain/source"
 	taskDomain "readbud/internal/domain/task"
@@ -770,65 +773,180 @@ func (s *Server) handleArticleWrite(ctx context.Context, t *asynq.Task) error {
 	return s.enqueueNext(pipeline.TypeImageMatch, *p)
 }
 
-// generateAndStoreImage runs imageGen, fetches/decodes the bytes,
-// uploads to storage, and returns a local URL. Returns error on any failure
-// so callers can fall back to alternative image sources.
-func (s *Server) generateAndStoreImage(ctx context.Context, prompt string) (string, error) {
+// matchedImage carries both the embed-ready URL and the persisted asset ID
+// so callers can both render the article and link the asset to a block.
+type matchedImage struct {
+	URL     string
+	AssetID int64
+}
+
+// persistImageAsAsset writes raw image bytes to storage AND creates an asset
+// row, so the WeChat publish flow can later find and re-upload the image.
+//
+//	bucket        — storage bucket ("generated" or "search")
+//	data          — raw image bytes
+//	sourceKind    — asset.SourceKindGenerated or asset.SourceKindSearch
+//	isAIGenerated — 1 for image-gen output, 0 for stock search
+//	sourceURL     — original URL (Pexels page) for search; nil for generated
+//	promptText    — the LLM prompt used to generate; nil for search
+func (s *Server) persistImageAsAsset(
+	ctx context.Context,
+	bucket string,
+	data []byte,
+	sourceKind string,
+	isAIGenerated int16,
+	sourceURL *string,
+	promptText *string,
+) (string, int64, error) {
+	mime := http.DetectContentType(data)
+	ext := "png"
+	switch mime {
+	case "image/png":
+		ext = "png"
+	case "image/jpeg":
+		ext = "jpg"
+	default:
+		return "", 0, fmt.Errorf("persistImageAsAsset: unsupported mime %q", mime)
+	}
+
+	now := time.Now().UTC()
+	entropy := ulid.Monotonic(rand.New(rand.NewSource(now.UnixNano())), 0)
+	id := ulid.MustNew(ulid.Timestamp(now), entropy).String()
+	key := fmt.Sprintf("%04d%02d/%s.%s", now.Year(), now.Month(), id, ext)
+
+	publicURL, err := s.storage.Upload(ctx, bucket, key, data, mime)
+	if err != nil {
+		return "", 0, fmt.Errorf("persistImageAsAsset: upload: %w", err)
+	}
+
+	sum := sha256.Sum256(data)
+	sha := hex.EncodeToString(sum[:])
+	sz := int64(len(data))
+
+	assetType := asset.AssetTypeContentImage
+	if isAIGenerated == 1 {
+		assetType = asset.AssetTypeGeneratedImage
+	}
+
+	a := &asset.Asset{
+		AssetType:          assetType,
+		SourceKind:         sourceKind,
+		MimeType:           mime,
+		StorageProvider:    "local",
+		Bucket:             bucket,
+		ObjectKey:          key,
+		SizeBytes:          &sz,
+		SHA256:             sha,
+		SourceURL:          sourceURL,
+		PromptText:         promptText,
+		IsAIGenerated:      isAIGenerated,
+		WechatUploadStatus: asset.WechatUploadPending,
+	}
+	if err := s.assetRepo.Create(ctx, a); err != nil {
+		return "", 0, fmt.Errorf("persistImageAsAsset: create asset: %w", err)
+	}
+	return publicURL, a.ID, nil
+}
+
+// generateImageWithAsset runs imageGen, downloads/decodes bytes, persists them
+// via persistImageAsAsset, and returns a matchedImage ready for embedding.
+func (s *Server) generateImageWithAsset(ctx context.Context, prompt string) (*matchedImage, error) {
 	gen, err := s.imageGen.Generate(ctx, prompt, adapter.ImageGenOptions{
 		Width:  1024,
 		Height: 768,
 		Style:  "professional",
 	})
 	if err != nil {
-		return "", fmt.Errorf("generateAndStoreImage: gen: %w", err)
+		return nil, fmt.Errorf("generateImageWithAsset: gen: %w", err)
 	}
 
 	var data []byte
 	switch {
 	case gen.Base64 != "":
 		raw := gen.Base64
-		// Strip optional data-URL prefix like "data:image/png;base64,"
 		if i := strings.Index(raw, ","); i >= 0 && strings.Contains(raw[:i], "base64") {
 			raw = raw[i+1:]
 		}
 		decoded, decErr := base64.StdEncoding.DecodeString(raw)
 		if decErr != nil {
-			return "", fmt.Errorf("generateAndStoreImage: decode base64: %w", decErr)
+			return nil, fmt.Errorf("generateImageWithAsset: decode base64: %w", decErr)
 		}
 		data = decoded
 	case gen.URL != "":
 		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, gen.URL, nil)
 		if reqErr != nil {
-			return "", fmt.Errorf("generateAndStoreImage: build request: %w", reqErr)
+			return nil, fmt.Errorf("generateImageWithAsset: build request: %w", reqErr)
 		}
 		client := &http.Client{Timeout: 30 * time.Second}
 		resp, getErr := client.Do(req)
 		if getErr != nil {
-			return "", fmt.Errorf("generateAndStoreImage: download: %w", getErr)
+			return nil, fmt.Errorf("generateImageWithAsset: download: %w", getErr)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode >= 400 {
-			return "", fmt.Errorf("generateAndStoreImage: download status %d", resp.StatusCode)
+			return nil, fmt.Errorf("generateImageWithAsset: download status %d", resp.StatusCode)
 		}
 		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 20*1024*1024))
 		if readErr != nil {
-			return "", fmt.Errorf("generateAndStoreImage: read body: %w", readErr)
+			return nil, fmt.Errorf("generateImageWithAsset: read body: %w", readErr)
 		}
 		data = body
 	default:
-		return "", fmt.Errorf("generateAndStoreImage: empty result (no URL, no base64)")
+		return nil, fmt.Errorf("generateImageWithAsset: empty result (no URL, no base64)")
 	}
 
-	now := time.Now().UTC()
-	entropy := ulid.Monotonic(rand.New(rand.NewSource(now.UnixNano())), 0)
-	id := ulid.MustNew(ulid.Timestamp(now), entropy).String()
-	key := fmt.Sprintf("%04d%02d/%s.png", now.Year(), now.Month(), id)
-
-	url, upErr := s.storage.Upload(ctx, "generated", key, data, "image/png")
-	if upErr != nil {
-		return "", fmt.Errorf("generateAndStoreImage: upload: %w", upErr)
+	promptCopy := prompt
+	publicURL, assetID, err := s.persistImageAsAsset(
+		ctx,
+		"generated",
+		data,
+		asset.SourceKindGenerated,
+		1,
+		nil,
+		&promptCopy,
+	)
+	if err != nil {
+		return nil, err
 	}
-	return url, nil
+	return &matchedImage{URL: publicURL, AssetID: assetID}, nil
+}
+
+// pexelsImageWithAsset downloads a Pexels CDN URL, persists the bytes via
+// persistImageAsAsset, and returns a matchedImage. The original Pexels
+// URL is recorded as the asset's source_url for attribution.
+func (s *Server) pexelsImageWithAsset(ctx context.Context, pexelsURL string) (*matchedImage, error) {
+	req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, pexelsURL, nil)
+	if reqErr != nil {
+		return nil, fmt.Errorf("pexelsImageWithAsset: build request: %w", reqErr)
+	}
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, getErr := client.Do(req)
+	if getErr != nil {
+		return nil, fmt.Errorf("pexelsImageWithAsset: download: %w", getErr)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("pexelsImageWithAsset: download status %d", resp.StatusCode)
+	}
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, 20*1024*1024))
+	if readErr != nil {
+		return nil, fmt.Errorf("pexelsImageWithAsset: read body: %w", readErr)
+	}
+
+	source := pexelsURL
+	publicURL, assetID, err := s.persistImageAsAsset(
+		ctx,
+		"search",
+		body,
+		asset.SourceKindSearch,
+		0,
+		&source,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &matchedImage{URL: publicURL, AssetID: assetID}, nil
 }
 
 func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
@@ -857,15 +975,14 @@ func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 	}
 
 	const maxImages = 2
-	urls := make([]string, 0, maxImages)
+	matched := make([]matchedImage, 0, maxImages)
 
 	// 1. generate_only or auto: try generation first.
-	// In generate_only we continue past failures (user opted out of fallback);
-	// in auto we break early so Pexels fallback can take over quickly.
+	// In generate_only we continue past failures; in auto we break so Pexels can take over.
 	if mode == taskDomain.ImageModeGenerateOnly || mode == taskDomain.ImageModeAuto {
 		for i := 0; i < maxImages; i++ {
 			prompt := fmt.Sprintf("editorial illustration about %s, clean magazine style, high quality", task.Keyword)
-			localURL, genErr := s.generateAndStoreImage(ctx, prompt)
+			img, genErr := s.generateImageWithAsset(ctx, prompt)
 			if genErr != nil {
 				s.logger.Warn("image match: generate failed", zap.Error(genErr), zap.Int("idx", i))
 				if mode == taskDomain.ImageModeAuto {
@@ -873,13 +990,13 @@ func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 				}
 				continue
 			}
-			urls = append(urls, localURL)
+			matched = append(matched, *img)
 		}
 	}
 
-	// 2. search_only, or auto with insufficient generated, fall back to Pexels
+	// 2. search_only, or auto with insufficient generated, fall back to Pexels.
 	needPexels := (mode == taskDomain.ImageModeSearchOnly) ||
-		(mode == taskDomain.ImageModeAuto && len(urls) < maxImages)
+		(mode == taskDomain.ImageModeAuto && len(matched) < maxImages)
 	if needPexels {
 		searchQuery := task.Keyword
 		engQuery, engErr := s.callLLM(ctx,
@@ -896,19 +1013,24 @@ func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 			s.logger.Warn("image match: search failed", zap.Error(searchErr))
 		}
 		for _, r := range results {
-			if len(urls) >= maxImages {
+			if len(matched) >= maxImages {
 				break
 			}
-			urls = append(urls, r.URL)
+			img, perr := s.pexelsImageWithAsset(ctx, r.URL)
+			if perr != nil {
+				s.logger.Warn("image match: pexels persist failed", zap.Error(perr), zap.String("url", r.URL))
+				continue
+			}
+			matched = append(matched, *img)
 		}
 	}
 
-	if len(urls) == 0 {
+	if len(matched) == 0 {
 		s.logger.Info("image match: no images obtained, continuing")
 		return s.enqueueNext(pipeline.TypeChartGen, *p)
 	}
 
-	// 3. Embed URLs into draft section blocks
+	// 3. Embed URLs into draft section blocks AND link asset_id.
 	blocks, err := s.blockRepo.FindByDraftID(ctx, *task.ResultDraftID)
 	if err != nil || len(blocks) == 0 {
 		return s.enqueueNext(pipeline.TypeChartGen, *p)
@@ -916,9 +1038,9 @@ func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 
 	imgIdx := 0
 	for i, block := range blocks {
-		if block.BlockType == "section" && imgIdx < len(urls) {
+		if block.BlockType == "section" && imgIdx < len(matched) {
 			imgTag := fmt.Sprintf(`<figure style="margin:20px 0;text-align:center"><img src="%s" alt="%s" style="width:100%%;max-width:100%%;border-radius:12px;display:block" /></figure>`,
-				urls[imgIdx], task.Keyword)
+				matched[imgIdx].URL, task.Keyword)
 
 			existing := ""
 			if block.HTMLFragment != nil {
@@ -926,6 +1048,8 @@ func (s *Server) handleImageMatch(ctx context.Context, t *asynq.Task) error {
 			}
 			newHtml := imgTag + existing
 			blocks[i].HTMLFragment = &newHtml
+			assetID := matched[imgIdx].AssetID
+			blocks[i].AssetID = &assetID
 			if err := s.blockRepo.Update(ctx, &blocks[i]); err != nil {
 				s.logger.Warn("image match: block update failed",
 					zap.Error(err),
