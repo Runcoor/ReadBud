@@ -19,12 +19,9 @@ redis:
   db: 0
 
 storage:
-  provider: minio
-  endpoint: host.docker.internal:19000
-  access_key: minioadmin
-  secret_key: minioadmin
-  bucket: readbud
-  use_ssl: false
+  provider: local
+  root_dir: /app/data/images
+  public_base: /static/images
 
 jwt:
   secret: readbud-jwt-secret-change-in-production
