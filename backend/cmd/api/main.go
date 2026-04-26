@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"readbud/internal/adapter"
 	"readbud/internal/api"
 	apiHTTP "readbud/internal/api/http"
 	"readbud/internal/api/middleware"
@@ -24,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -104,6 +106,13 @@ func main() {
 	// SSE hub for real-time task progress
 	sseHub := sse.NewHub()
 
+	// Storage provider — local FS or stub fallback
+	storageProvider, storageRoot := newStorageProvider()
+	if storageRoot != "" {
+		r.Static("/static/images", storageRoot)
+		logger.S().Infof("serving static images from %s at /static/images", storageRoot)
+	}
+
 	// Redis subscriber: forwards worker SSE events to the local Hub
 	redisAddr := viper.GetString("redis.addr")
 	redisPassword := viper.GetString("redis.password")
@@ -150,7 +159,6 @@ func main() {
 		// Stub adapters for development (used as fallbacks)
 		stubPublisher := wechat.NewStubWeChatPublisher(logger.L)
 		stubTokenProv := wechat.NewStubTokenProvider()
-		stubStorage := storage.NewStubStorageProvider(logger.L)
 		stubMetricsSync := wechat.NewStubMetricsSyncProvider(logger.L)
 		stubLLM := llm.NewStubLLMProvider(logger.L)
 		stubImageGen := imageStub.NewStubImageGenProvider(logger.L)
@@ -174,7 +182,7 @@ func main() {
 		wechatSvc := service.NewWechatAccountService(wechatRepo, encSecret)
 		taskSvc := service.NewTaskService(taskRepo, draftRepo, sseHub, asynqClient, brandRepo)
 		draftSvc := service.NewDraftService(draftRepo, blockRepo, sourceRepo, taskRepo)
-		contentImageSvc := service.NewContentImageService(assetRepo, stubPublisher, stubStorage, stubTokenProv, logger.L)
+		contentImageSvc := service.NewContentImageService(assetRepo, stubPublisher, storageProvider, stubTokenProv, logger.L)
 		publishSvc := service.NewPublishService(publishJobRepo, publishRecordRepo, stubPublisher, stubTokenProv, contentImageSvc, logger.L)
 		metricsSvc := service.NewMetricsService(metricsRepo, publishRecordRepo, stubMetricsSync, stubTokenProv, logger.L)
 		topicLibrarySvc := service.NewTopicLibraryService(topicLibraryRepo, taskRepo, metricsRepo, logger.L)
@@ -235,6 +243,30 @@ func main() {
 	logger.S().Infof("ReadBud API server starting on %s", addr)
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("failed to start server: %v", err)
+	}
+}
+
+// newStorageProvider returns a StorageProvider based on the storage.provider config key.
+// Returns the provider plus the on-disk root dir (empty string when provider is not local).
+// Falls back to the stub when the configured provider is unknown so we never crash on boot.
+func newStorageProvider() (adapter.StorageProvider, string) {
+	provider := viper.GetString("storage.provider")
+	rootDir := viper.GetString("storage.root_dir")
+	publicBase := viper.GetString("storage.public_base")
+	switch provider {
+	case "local":
+		if rootDir == "" {
+			rootDir = "./data/images"
+		}
+		if publicBase == "" {
+			publicBase = "/static/images"
+		}
+		return storage.NewLocalStorageProvider(rootDir, publicBase, logger.L), rootDir
+	default:
+		logger.L.Warn("storage.provider not 'local', falling back to stub",
+			zap.String("provider", provider),
+		)
+		return storage.NewStubStorageProvider(logger.L), ""
 	}
 }
 
