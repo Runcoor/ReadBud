@@ -46,3 +46,6 @@ coverage/
 
 # Temp scripts
 parse_issues.js
+
+# Data directories
+/data/images/
