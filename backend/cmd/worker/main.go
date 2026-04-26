@@ -84,6 +84,7 @@ func main() {
 	sourceRepo := postgres.NewSourceDocumentRepository(db)
 	providerRepo := postgres.NewProviderConfigRepository(db)
 	brandRepo := postgres.NewBrandProfileRepository(db)
+	assetRepo := postgres.NewAssetRepository(db)
 
 	// Asynq client (for enqueuing next stages)
 	asynqClient := asynq.NewClient(asynq.RedisClientOpt{
@@ -193,7 +194,7 @@ func main() {
 	}
 
 	storageProvider := newStorageProvider()
-	srv := worker.NewServer(workerCfg, taskSvc, draftRepo, blockRepo, sourceRepo, brandRepo, lazyLLM, searchProvider, crawlerProvider, imageSearchProvider, imageGenProvider, storageProvider, logger.L)
+	srv := worker.NewServer(workerCfg, taskSvc, draftRepo, blockRepo, sourceRepo, brandRepo, lazyLLM, searchProvider, crawlerProvider, imageSearchProvider, imageGenProvider, assetRepo, storageProvider, logger.L)
 
 	// Start
 	if err := srv.Start(); err != nil {

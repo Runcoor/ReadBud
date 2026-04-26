@@ -44,6 +44,7 @@ type Server struct {
 	crawlerProvider adapter.CrawlerProvider
 	imageSearch     adapter.ImageSearchProvider
 	imageGen        adapter.ImageGenProvider
+	assetRepo       postgres.AssetRepository
 	storage         adapter.StorageProvider
 	logger          *zap.Logger
 }
@@ -69,6 +70,7 @@ func NewServer(
 	crawlerProvider adapter.CrawlerProvider,
 	imageSearch adapter.ImageSearchProvider,
 	imageGen adapter.ImageGenProvider,
+	assetRepo postgres.AssetRepository,
 	storageProvider adapter.StorageProvider,
 	logger *zap.Logger,
 ) *Server {
@@ -111,6 +113,7 @@ func NewServer(
 		crawlerProvider: crawlerProvider,
 		imageSearch:     imageSearch,
 		imageGen:        imageGen,
+		assetRepo:       assetRepo,
 		storage:         storageProvider,
 		logger:          logger,
 	}
