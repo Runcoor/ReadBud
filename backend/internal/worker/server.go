@@ -39,6 +39,7 @@ type Server struct {
 	crawlerProvider adapter.CrawlerProvider
 	imageSearch     adapter.ImageSearchProvider
 	imageGen        adapter.ImageGenProvider
+	storage         adapter.StorageProvider
 	logger          *zap.Logger
 }
 
@@ -63,6 +64,7 @@ func NewServer(
 	crawlerProvider adapter.CrawlerProvider,
 	imageSearch adapter.ImageSearchProvider,
 	imageGen adapter.ImageGenProvider,
+	storageProvider adapter.StorageProvider,
 	logger *zap.Logger,
 ) *Server {
 	redisOpt := asynq.RedisClientOpt{
@@ -104,6 +106,7 @@ func NewServer(
 		crawlerProvider: crawlerProvider,
 		imageSearch:     imageSearch,
 		imageGen:        imageGen,
+		storage:         storageProvider,
 		logger:          logger,
 	}
 }
@@ -873,10 +876,14 @@ func (s *Server) handleChartGen(ctx context.Context, t *asynq.Task) error {
 		text := derefStr(b.TextMD)
 		hasImg := b.HTMLFragment != nil && strings.Contains(*b.HTMLFragment, "<img")
 		articleSummary.WriteString(fmt.Sprintf("Block %d [%s]%s: %s\n", i, bType, func() string {
-			if heading != "" { return " heading=\"" + heading + "\"" }
+			if heading != "" {
+				return " heading=\"" + heading + "\""
+			}
 			return ""
 		}(), func() string {
-			if len(text) > 150 { return text[:150] + "..." }
+			if len(text) > 150 {
+				return text[:150] + "..."
+			}
 			return text
 		}()))
 		if hasImg {
@@ -1020,7 +1027,11 @@ func (s *Server) handleHTMLCompile(ctx context.Context, t *asynq.Task) error {
 		d, _ := s.draftRepo.FindByID(ctx, *task.ResultDraftID)
 		if d != nil {
 			blocks, _ := s.blockRepo.FindByDraftID(ctx, d.ID)
-			html := compileHTML(d.Title, blocks)
+			style := ""
+			if task != nil {
+				style = task.ArticleStyle
+			}
+			html := compileHTML(d.Title, blocks, style)
 			d.CompiledHTML = html
 			s.draftRepo.Update(ctx, d)
 		}
@@ -1099,38 +1110,22 @@ func extractJSON(s string) string {
 	return s[start:]
 }
 
-func compileHTML(title string, blocks []draft.ArticleBlock) string {
+func compileHTML(title string, blocks []draft.ArticleBlock, styleName string) string {
+	sc := pipelinePkg.GetStyleConfig(styleName)
+
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(`<h1 style="font-size:24px;font-weight:bold;margin-bottom:16px;">%s</h1>`, title))
+	sb.WriteString(fmt.Sprintf(`<section style="max-width:100%%;padding:0;margin:0;background:%s;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;">`, sc.BgColor))
+	sb.WriteString(fmt.Sprintf(`<h1 style="font-size:24px;font-weight:bold;margin-bottom:16px;color:%s;">%s</h1>`, sc.PrimaryColor, title))
 
 	for _, b := range blocks {
-		// If html_fragment exists (from visual enhance), use it directly
 		if b.HTMLFragment != nil && *b.HTMLFragment != "" {
 			sb.WriteString(*b.HTMLFragment)
 			continue
 		}
-
-		switch b.BlockType {
-		case draft.BlockTypeLead:
-			text := derefStr(b.TextMD)
-			sb.WriteString(fmt.Sprintf(`<p style="font-size:16px;color:#525252;margin-bottom:20px;line-height:1.8;">%s</p>`, text))
-		case draft.BlockTypeSection:
-			heading := derefStr(b.Heading)
-			text := derefStr(b.TextMD)
-			if heading != "" {
-				sb.WriteString(fmt.Sprintf(`<h2 style="font-size:20px;font-weight:bold;margin:24px 0 12px;">%s</h2>`, heading))
-			}
-			sb.WriteString(fmt.Sprintf(`<p style="font-size:15px;line-height:1.8;margin-bottom:16px;">%s</p>`, text))
-		case draft.BlockTypeCTA:
-			text := derefStr(b.TextMD)
-			sb.WriteString(fmt.Sprintf(`<p style="font-size:15px;color:#0a0a0a;font-weight:bold;margin-top:24px;padding:16px;background:#f5f5f5;border-radius:8px;">%s</p>`, text))
-		default:
-			text := derefStr(b.TextMD)
-			if text != "" {
-				sb.WriteString(fmt.Sprintf(`<p style="font-size:15px;line-height:1.8;margin-bottom:16px;">%s</p>`, text))
-			}
-		}
+		sb.WriteString(pipelinePkg.CompileBlockStyled(b, sc))
 	}
+
+	sb.WriteString("</section>")
 	return sb.String()
 }
 

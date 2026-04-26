@@ -18,13 +18,35 @@ import (
 	imageInteg "readbud/internal/integration/image"
 	"readbud/internal/integration/llm"
 	searchInteg "readbud/internal/integration/search"
+	"readbud/internal/integration/storage"
 	"readbud/internal/pkg/database"
 	"readbud/internal/pkg/logger"
 	"readbud/internal/pkg/sse"
 	"readbud/internal/repository/postgres"
 	"readbud/internal/service"
 	"readbud/internal/worker"
+
+	"go.uber.org/zap"
 )
+
+func newStorageProvider() adapter.StorageProvider {
+	provider := viper.GetString("storage.provider")
+	rootDir := viper.GetString("storage.root_dir")
+	publicBase := viper.GetString("storage.public_base")
+	if provider == "local" {
+		if rootDir == "" {
+			rootDir = "/app/data/images"
+		}
+		if publicBase == "" {
+			publicBase = "/static/images"
+		}
+		return storage.NewLocalStorageProvider(rootDir, publicBase, logger.L)
+	}
+	logger.L.Warn("storage.provider not 'local', falling back to stub",
+		zap.String("provider", provider),
+	)
+	return storage.NewStubStorageProvider(logger.L)
+}
 
 func main() {
 	initConfig()
@@ -106,23 +128,37 @@ func main() {
 	stubImageGen := imageInteg.NewStubImageGenProvider(logger.L)
 	imageGenProvider := integration.NewLazyImageGenProvider(providerFactory, stubImageGen)
 
-	// Google Search provider — resolve from DB config with stub fallback
+	// Search provider — resolve from DB config with stub fallback
 	var searchProvider adapter.SearchProvider
 	searchCfg, searchCfgErr := providerSvc.GetActiveByType(context.Background(), "search")
 	if searchCfgErr == nil && searchCfg != nil {
 		searchSecret, _ := providerSvc.DecryptSecret(context.Background(), searchCfg)
 		apiKey := integration.ParseAPIKey(searchSecret)
 		var cfg struct {
+			SearchProvider string `json:"search_provider"`
 			SearchEngineID string `json:"search_engine_id"`
 		}
 		_ = json.Unmarshal(searchCfg.ConfigJSON, &cfg)
-		if apiKey != "" && cfg.SearchEngineID != "" {
-			searchProvider = searchInteg.NewGoogleSearchProvider(apiKey, cfg.SearchEngineID, logger.L)
-			keyPreview := apiKey
-			if len(keyPreview) > 8 {
-				keyPreview = keyPreview[:8] + "..."
+
+		switch cfg.SearchProvider {
+		case "tavily":
+			if apiKey != "" {
+				searchProvider = searchInteg.NewTavilySearchProvider(apiKey, logger.L)
+				keyPreview := apiKey
+				if len(keyPreview) > 8 {
+					keyPreview = keyPreview[:8] + "..."
+				}
+				log.Printf("[search] Tavily: key_prefix=%s", keyPreview)
 			}
-			log.Printf("[search] Google CSE: key_prefix=%s engine_id=%s", keyPreview, cfg.SearchEngineID)
+		default: // google_custom or empty
+			if apiKey != "" && cfg.SearchEngineID != "" {
+				searchProvider = searchInteg.NewGoogleSearchProvider(apiKey, cfg.SearchEngineID, logger.L)
+				keyPreview := apiKey
+				if len(keyPreview) > 8 {
+					keyPreview = keyPreview[:8] + "..."
+				}
+				log.Printf("[search] Google CSE: key_prefix=%s engine_id=%s", keyPreview, cfg.SearchEngineID)
+			}
 		}
 	}
 	if searchProvider == nil {
@@ -156,7 +192,8 @@ func main() {
 		Concurrency:   5,
 	}
 
-	srv := worker.NewServer(workerCfg, taskSvc, draftRepo, blockRepo, sourceRepo, brandRepo, lazyLLM, searchProvider, crawlerProvider, imageSearchProvider, imageGenProvider, logger.L)
+	storageProvider := newStorageProvider()
+	srv := worker.NewServer(workerCfg, taskSvc, draftRepo, blockRepo, sourceRepo, brandRepo, lazyLLM, searchProvider, crawlerProvider, imageSearchProvider, imageGenProvider, storageProvider, logger.L)
 
 	// Start
 	if err := srv.Start(); err != nil {
