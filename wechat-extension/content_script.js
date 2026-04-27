@@ -83,12 +83,38 @@ function setNativeInputValue(el, value) {
   el.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
-function findFirst(selectors) {
+function findFirst(selectors, root = document) {
   for (const sel of selectors) {
-    const el = document.querySelector(sel)
+    const el = root.querySelector(sel)
     if (el) return el
   }
   return null
+}
+
+// dumpFormFields prints id/name/placeholder for the first 30 input/textarea
+// elements on the page (and inside same-origin iframes). Called when a filler
+// can't find its target so the user can share the snapshot for selector tuning.
+function dumpFormFields(label) {
+  const collect = (root, where) => {
+    return Array.from(root.querySelectorAll('input, textarea')).slice(0, 30).map((e) => ({
+      where,
+      tag: e.tagName,
+      id: e.id || '',
+      name: e.name || '',
+      placeholder: e.placeholder || '',
+      className: typeof e.className === 'string' ? e.className.slice(0, 80) : '',
+    }))
+  }
+  const out = collect(document, 'document')
+  for (const f of document.querySelectorAll('iframe')) {
+    try {
+      if (f.contentDocument) {
+        out.push(...collect(f.contentDocument, `iframe[src="${(f.src || '').slice(0, 80)}"]`))
+      }
+    } catch { /* cross-origin */ }
+  }
+  rbWarn(`[${label}] target not found. URL=${location.href}`)
+  rbWarn(`[${label}] candidate fields:`, out)
 }
 
 function fillTitle(pkg) {
@@ -97,31 +123,41 @@ function fillTitle(pkg) {
     'input#title',
     '[name="title"]',
     'input.js_title',
+    'input[placeholder*="标题"]',
+    'textarea[placeholder*="标题"]',
+    'input[placeholder*="请输入标题"]',
   ])
-  if (!el) return false
+  if (!el) { dumpFormFields('title'); return false }
   setNativeInputValue(el, pkg.title || '')
   return true
 }
 
 function fillAuthor(pkg) {
+  if (!pkg.author) return false
   const el = findFirst([
     '#author',
     'input#author',
     '[name="author"]',
+    'input[placeholder*="作者"]',
+    'input[placeholder*="请填写作者"]',
   ])
-  if (!el || !pkg.author) return false
+  if (!el) { dumpFormFields('author'); return false }
   setNativeInputValue(el, pkg.author)
   return true
 }
 
 function fillDigest(pkg) {
+  if (!pkg.digest) return false
   const el = findFirst([
     '#js_description',
     'textarea#js_description',
     '[name="digest"]',
     'textarea.js_desc',
+    'textarea[placeholder*="摘要"]',
+    'textarea[placeholder*="选填"]',
+    'textarea[maxlength="120"]',
   ])
-  if (!el || !pkg.digest) return false
+  if (!el) { dumpFormFields('digest'); return false }
   setNativeInputValue(el, pkg.digest)
   return true
 }
@@ -133,46 +169,45 @@ function fillSourceURL(pkg) {
     'input#js_url',
     '[name="content_source_url"]',
     'input.js_link',
+    'input[placeholder*="原文链接"]',
+    'input[placeholder*="链接"]',
   ])
-  if (!el) return false
+  if (!el) { dumpFormFields('sourceURL'); return false }
   setNativeInputValue(el, pkg.source_url)
   return true
 }
 
-// Locate the rich-text editor iframe. WeChat uses an iframe for the body to
-// isolate styles. We attempt to access its document — same-origin with
-// mp.weixin.qq.com so this should work.
-function findEditorIframe() {
-  const iframes = document.querySelectorAll('iframe')
-  for (const f of iframes) {
+// findEditable returns the rich-text editor host. Modern WeChat layouts
+// sometimes mount contenteditable directly in the main document; older ones
+// isolate it in an iframe. Try direct first, then fall back to scanning
+// same-origin iframes.
+function findEditable() {
+  const direct = document.querySelector(
+    'div[contenteditable="true"][class*="editor"], ' +
+    'div[contenteditable="true"][class*="rich"], ' +
+    '[id*="ueditor"] [contenteditable="true"], ' +
+    'div[contenteditable="true"]'
+  )
+  if (direct) return direct
+
+  for (const f of document.querySelectorAll('iframe')) {
     try {
       const doc = f.contentDocument
       if (!doc) continue
-      const body = doc.body
-      // Heuristic: the editor body has contenteditable="true" or class .editor
-      if (body && (body.isContentEditable || body.querySelector('[contenteditable="true"]'))) {
-        return f
-      }
-    } catch {
-      // cross-origin frame; skip
-    }
+      if (doc.body?.isContentEditable) return doc.body
+      const inner = doc.querySelector('[contenteditable="true"]')
+      if (inner) return inner
+    } catch { /* cross-origin */ }
   }
   return null
 }
 
 function fillBodyHTML(pkg) {
   if (!pkg.content_html) return false
-  const iframe = findEditorIframe()
-  if (!iframe) {
-    rbWarn('editor iframe not found')
-    return false
-  }
-  const doc = iframe.contentDocument
-  const editable = doc.body.isContentEditable
-    ? doc.body
-    : doc.querySelector('[contenteditable="true"]')
+  const editable = findEditable()
   if (!editable) {
-    rbWarn('editable region not found')
+    rbWarn('[body] editable region not found. URL=', location.href)
+    rbWarn('[body] iframes on page:', Array.from(document.querySelectorAll('iframe')).map(f => f.src || '(no src)'))
     return false
   }
   // Focus + clear + paste-event with text/html. Going through ClipboardEvent
@@ -234,7 +269,14 @@ function base64ToFile(base64, mime, filename) {
 async function fillCover(pkg) {
   if (!pkg.cover_base64 || !pkg.cover_mime_type) return false
   const input = findCoverFileInput()
-  if (!input) return false
+  if (!input) {
+    rbWarn('[cover] file input not found. file inputs on page:',
+      Array.from(document.querySelectorAll('input[type="file"]')).map((e) => ({
+        id: e.id, name: e.name, accept: e.accept,
+        parent: e.parentElement?.className?.toString().slice(0, 80),
+      })))
+    return false
+  }
   const file = base64ToFile(pkg.cover_base64, pkg.cover_mime_type, pkg.cover_filename)
   const dt = new DataTransfer()
   dt.items.add(file)
