@@ -26,6 +26,7 @@ import (
 	"readbud/internal/domain/asset"
 	"readbud/internal/domain/draft"
 	"readbud/internal/repository/postgres"
+	"readbud/internal/service/imageresize"
 )
 
 const (
@@ -33,8 +34,14 @@ const (
 	coverDownloadCap      = 20 * 1024 * 1024
 	coverDownloadTimeout  = 60 * time.Second
 	coverDefaultStyleName = "minimal"
-	coverWidth            = 1024
-	coverHeight           = 576 // 16:9 — matches WeChat cover thumbnail aspect
+	// Final cover dimensions stored and shipped to WeChat (16:9 thumbnail aspect).
+	coverWidth  = 1024
+	coverHeight = 576
+	// Image-gen request dimensions. Most providers (DALL-E 3, gpt-image-1, and
+	// the Chinese gateways that follow them) reject sub-1MP sizes, so we ask
+	// for a square at the supported minimum and crop down to 16:9 ourselves.
+	coverGenWidth  = 1024
+	coverGenHeight = 1024
 )
 
 // CoverVO is the view object for an article cover image.
@@ -104,17 +111,24 @@ func (s *CoverImageService) GenerateForDraft(ctx context.Context, draftPublicID 
 
 	prompt := buildCoverPrompt(d)
 	gen, err := s.imageGen.Generate(ctx, prompt, adapter.ImageGenOptions{
-		Width:  coverWidth,
-		Height: coverHeight,
+		Width:  coverGenWidth,
+		Height: coverGenHeight,
 		Style:  d.StyleUsed,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("coverImageService.GenerateForDraft: image gen: %w", err)
 	}
 
-	data, err := s.materializeBytes(ctx, gen)
+	rawData, err := s.materializeBytes(ctx, gen)
 	if err != nil {
 		return nil, fmt.Errorf("coverImageService.GenerateForDraft: materialize: %w", err)
+	}
+
+	// Image-gen returns a square; center-crop to 16:9 to match the WeChat
+	// thumbnail aspect. Output is JPEG so persistCoverAsset stores .jpg.
+	data, _, err := imageresize.CropToSize(rawData, coverWidth, coverHeight)
+	if err != nil {
+		return nil, fmt.Errorf("coverImageService.GenerateForDraft: crop: %w", err)
 	}
 
 	a, publicURL, err := s.persistCoverAsset(ctx, data, prompt)

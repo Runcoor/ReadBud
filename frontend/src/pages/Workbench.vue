@@ -595,7 +595,11 @@ function handleExport() {
 .workbench {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  // Bind to viewport so .workspace (flex:1, min-height:0) caps each column
+  // and per-column overflow-y:auto activates instead of letting the document
+  // scroll as a whole.
+  height: 100vh;
+  overflow: hidden;
   background: var(--brand-paper);
   font-family: var(--font-sans);
   color: var(--text-primary);

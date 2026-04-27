@@ -24,7 +24,7 @@
 const STORAGE_KEY = 'readbud:config'
 
 const DEFAULT_CONFIG = {
-  apiBase: 'http://localhost:8080/api/v1',
+  apiBase: 'http://localhost:19881/api/v1',
   token: '',
 }
 

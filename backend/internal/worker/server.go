@@ -1156,27 +1156,36 @@ func (s *Server) handleChartGen(ctx context.Context, t *asynq.Task) error {
 		return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
 	}
 
-	// Build current article summary for LLM context
-	var articleSummary strings.Builder
+	// Build per-block input for the LLM as a JSON array. Earlier versions
+	// concatenated text with byte-level slicing (text[:150]) which:
+	//   1. cut Chinese characters mid-byte and produced 还�� garbage,
+	//   2. fed only a 150-byte stub per block so the LLM had nothing to
+	//      enhance and produced shallow output, and
+	//   3. mixed prompt-only annotations like "(已有配图)" into block text,
+	//      which the LLM sometimes copied verbatim into the rewritten HTML.
+	// Structuring the input keeps annotations in separate fields and
+	// preserves the full source text.
+	type enhanceInputBlock struct {
+		Index    int    `json:"index"`
+		Type     string `json:"type"`
+		Heading  string `json:"heading,omitempty"`
+		Text     string `json:"text,omitempty"`
+		HasImage bool   `json:"has_image,omitempty"`
+	}
+	enhanceInput := make([]enhanceInputBlock, 0, len(blocks))
 	for i, b := range blocks {
-		bType := b.BlockType
-		heading := derefStr(b.Heading)
-		text := derefStr(b.TextMD)
-		hasImg := b.HTMLFragment != nil && strings.Contains(*b.HTMLFragment, "<img")
-		articleSummary.WriteString(fmt.Sprintf("Block %d [%s]%s: %s\n", i, bType, func() string {
-			if heading != "" {
-				return " heading=\"" + heading + "\""
-			}
-			return ""
-		}(), func() string {
-			if len(text) > 150 {
-				return text[:150] + "..."
-			}
-			return text
-		}()))
-		if hasImg {
-			articleSummary.WriteString("  (已有配图)\n")
-		}
+		enhanceInput = append(enhanceInput, enhanceInputBlock{
+			Index:    i,
+			Type:     b.BlockType,
+			Heading:  derefStr(b.Heading),
+			Text:     derefStr(b.TextMD),
+			HasImage: b.HTMLFragment != nil && strings.Contains(*b.HTMLFragment, "<img"),
+		})
+	}
+	enhanceInputJSON, err := json.Marshal(enhanceInput)
+	if err != nil {
+		s.logger.Warn("visual enhance: failed to marshal input", zap.Error(err))
+		return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
 	}
 
 	// LLM visual enhancement round.
@@ -1185,7 +1194,7 @@ func (s *Server) handleChartGen(ctx context.Context, t *asynq.Task) error {
 	// inline-styled HTML that matches the reference design.
 	enhancePrompt := buildVisualEnhancePrompt(baselineSC)
 
-	enhanceContent, err := s.callLLM(ctx, enhancePrompt, articleSummary.String(), 8192)
+	enhanceContent, err := s.callLLM(ctx, enhancePrompt, string(enhanceInputJSON), 16384)
 	if err != nil {
 		s.logger.Warn("visual enhance failed, continuing with original content", zap.Error(err))
 		return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
@@ -1378,6 +1387,13 @@ func buildVisualEnhancePrompt(sc pipelinePkg.StyleConfig) string {
 # 预设：%s（%s）
 %s
 
+## 输入格式
+用户消息是一个严格的 JSON 数组，每一项形如：
+{"index": <int>, "type": "<block类型>", "heading": "<可选>", "text": "<完整正文，可能有换行>", "has_image": <bool>}
+- text 字段是完整的正文（不会被截断）。请基于完整 text 重排版面，不要复读、缩短或省略。
+- has_image=true 表示该 block 已经挂了一张图（在 ReadBud 内部 html_fragment 中），你只负责文本部分的样式，**不要**在你的输出 HTML 里写"已有配图"、"(已有配图)"、"with image"、"index"、"has_image"、"type" 这些元字段或注释。
+- heading 字段如果存在，请按当前预设的 H2 装饰策略渲染。
+
 ## 设计 token（必须使用）
 - 主底色 paper: %s
 - 面板底色 paperAlt: %s
@@ -1398,11 +1414,12 @@ func buildVisualEnhancePrompt(sc pipelinePkg.StyleConfig) string {
 - 段落两侧留 22-24px 内边距（margin-left/right），不要顶到屏幕边
 - 配色严格使用上面 8 个 token，禁止引入其它颜色
 - 强调只用 1 种方式：%s 用 ==黄色高亮 span==；%s 用 红色 italic em；%s 用 橙色 bold
-- 不要改变文字内容，不要省略段落
+- **必须保留 text 字段的全部文字**，可以拆段、加强调，但不能删字、不能省略段落、不能用"..."代替
 - 已有的 <img>、<figure>、<svg> 标签必须原样保留
 - 行内 code 保留为 <code>，使用上面的样式
 
 ## 严禁
+- 在输出 HTML 中出现输入 JSON 的字段名或值（例如 "(已有配图)"、"index=0"、"has_image"）
 - class 选择器、id 选择器
 - @keyframes、CSS 动画
 - position:absolute / fixed
@@ -1417,7 +1434,7 @@ func buildVisualEnhancePrompt(sc pipelinePkg.StyleConfig) string {
 {
   "style_name": %q,
   "blocks": [
-    {"index": 0, "html": "对应 block 的完整 HTML，含 inline style"},
+    {"index": 0, "html": "对应 block 的完整 HTML，含 inline style；保留 text 全文"},
     {"index": 1, "html": "..."}
   ]
 }`,

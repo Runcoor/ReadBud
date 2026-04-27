@@ -92,6 +92,55 @@ func FitWeChat(data []byte, maxBytes int) ([]byte, string, error) {
 		maxBytes, len(scales)*len(qualities))
 }
 
+// CropToSize decodes data, center-crops it to targetW×targetH (preserving
+// the target aspect ratio), and returns the result as JPEG bytes.
+//
+// Behaviour:
+//   - The crop window is the largest rectangle of aspect targetW:targetH
+//     that fits inside the source, anchored to the source center.
+//   - The cropped region is then resampled to exactly targetW×targetH so
+//     the output dimensions are deterministic regardless of source size.
+//   - The output is JPEG at quality 90 with mime image/jpeg.
+func CropToSize(data []byte, targetW, targetH int) ([]byte, string, error) {
+	if len(data) == 0 {
+		return nil, "", errors.New("imageresize: empty data")
+	}
+	if targetW <= 0 || targetH <= 0 {
+		return nil, "", fmt.Errorf("imageresize: invalid target %dx%d", targetW, targetH)
+	}
+
+	src, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("imageresize: decode: %w", err)
+	}
+
+	sb := src.Bounds()
+	srcW, srcH := sb.Dx(), sb.Dy()
+	if srcW <= 0 || srcH <= 0 {
+		return nil, "", fmt.Errorf("imageresize: degenerate source %dx%d", srcW, srcH)
+	}
+
+	// Largest cropW × cropH at target aspect that fits in source.
+	cropW, cropH := srcW, srcH
+	if srcW*targetH > srcH*targetW {
+		cropW = srcH * targetW / targetH
+	} else {
+		cropH = srcW * targetH / targetW
+	}
+	x0 := sb.Min.X + (srcW-cropW)/2
+	y0 := sb.Min.Y + (srcH-cropH)/2
+	cropRect := image.Rect(x0, y0, x0+cropW, y0+cropH)
+
+	dst := image.NewRGBA(image.Rect(0, 0, targetW, targetH))
+	draw.CatmullRom.Scale(dst, dst.Bounds(), src, cropRect, draw.Over, nil)
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 90}); err != nil {
+		return nil, "", fmt.Errorf("imageresize: encode: %w", err)
+	}
+	return buf.Bytes(), mimeJPEG, nil
+}
+
 // scaleImage returns src downscaled by the given factor. For scale ≥ 1.0
 // it returns src unchanged. The output is an *image.RGBA produced by
 // Catmull-Rom resampling, which gives noticeably better quality than

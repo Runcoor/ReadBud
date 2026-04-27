@@ -10,10 +10,10 @@
   ],
   "host_permissions": [
     "https://mp.weixin.qq.com/*",
+    "http://localhost:19881/*",
+    "http://127.0.0.1:19881/*",
     "http://localhost:8080/*",
-    "http://localhost:8081/*",
-    "http://127.0.0.1:8080/*",
-    "http://127.0.0.1:8081/*"
+    "http://127.0.0.1:8080/*"
   ],
   "action": {
     "default_popup": "popup.html",
