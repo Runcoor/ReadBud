@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 import { get, post } from './request'
 import type { ApiResponse } from '@/types/api'
 import type { ArticleMetricsResponse, MetricsSyncResult, MetricsOverviewVO } from '@/types/metrics'

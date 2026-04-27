@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 // Task-related type definitions
 
 export type TaskStatus =
@@ -23,7 +28,7 @@ export type ImageMode = 'auto' | 'search_only' | 'generate_only'
 
 export type PublishMode = 'manual' | 'now' | 'schedule'
 
-export type ArticleStyle = 'minimal' | 'magazine' | 'listicle' | 'narrative' | 'faq' | 'casual'
+export type ArticleStyle = 'minimal' | 'magazine' | 'stitch'
 
 export interface CreateTaskRequest {
   keyword: string
@@ -123,10 +128,14 @@ export const PUBLISH_MODE_LABELS: Record<PublishMode, string> = {
 }
 
 export const ARTICLE_STYLE_LABELS: Record<ArticleStyle, string> = {
-  minimal: '极简专业',
-  magazine: '杂志编辑',
-  listicle: '清单干货',
-  narrative: '叙事故事',
-  faq: '问答拆解',
-  casual: '轻社交',
+  minimal: '极简专业 · 黑白底 + 荧光黄高亮',
+  magazine: '杂志编辑 · 米色纸张 + 报刊红',
+  stitch: '暖橙手账 · 米色底 + 暖橙强调',
+}
+
+/** Detail blurb shown beneath each style option. */
+export const ARTICLE_STYLE_DETAILS: Record<ArticleStyle, string> = {
+  minimal: '衬线标题 + 等宽编号，技术、AI、产品、知识深度内容首选。',
+  magazine: 'Bodoni 大字 + 报头报尾，品牌故事、人物专访、深度观点。',
+  stitch: '居中标题 + 装饰短横，教程、生活方式、轻量科普。',
 }

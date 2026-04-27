@@ -4,30 +4,36 @@
 // CSS Custom Properties (Light Theme = default)
 // ---------------------------------------------------------------
 :root {
-  // Surfaces
-  --surface-bg: #ffffff;
-  --surface-secondary: #fafafa;
-  --surface-tertiary: #f5f5f5;
-  --surface-hover: #ebebeb;
-  --surface-active: #e0e0e0;
-  --surface-inverse: #1a1a1a;
+  // Surfaces (warm-white "阅芽" palette)
+  --surface-bg: #FAFAF7;
+  --surface-secondary: #F5F3ED;
+  --surface-tertiary: #F0EEE8;
+  --surface-hover: #E8E6E0;
+  --surface-active: #DCDAD2;
+  --surface-inverse: #0A0A0A;
+  --surface-card: #FFFFFF;
 
   // Text
-  --text-primary: #0a0a0a;
+  --text-primary: #0A0A0A;
+  --text-body: #3A3A37;
   --text-secondary: #525252;
-  --text-tertiary: #a3a3a3;
-  --text-inverse: #ffffff;
-  --text-placeholder: #c4c4c4;
+  --text-tertiary: #8A8A85;
+  --text-faint: #B8B5AE;
+  --text-inverse: #F5F3ED;
+  --text-placeholder: #B8B5AE;
 
-  // Borders
-  --border-light: #e8e8e8;
-  --border-medium: #d4d4d4;
-  --border-heavy: #a3a3a3;
+  // Borders (warm hairlines)
+  --border-light: #E8E6E0;
+  --border-medium: #D6D3CB;
+  --border-heavy: #8A8A85;
+  --border-hair: #E8E6E0;
+  --border-hair-soft: #F0EEE8;
 
   // Shadows
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-drawer: -24px 0 48px -16px rgba(0, 0, 0, 0.16);
 
   // Glass effect
   --glass-bg: rgba(255, 255, 255, 0.6);
@@ -36,8 +42,30 @@
   --glass-bg-heavy: rgba(255, 255, 255, 0.85);
 
   // Scrollbar
-  --scrollbar-thumb: #d4d4d4;
-  --scrollbar-thumb-hover: #a3a3a3;
+  --scrollbar-thumb: #D6D3CB;
+  --scrollbar-thumb-hover: #8A8A85;
+
+  // ------------------------------------------------------------
+  // Brand tokens (阅芽 — sprout green + status semantics)
+  // ------------------------------------------------------------
+  --brand-ink: #0A0A0A;
+  --brand-ink-soft: #1F1F1D;
+  --brand-paper: #FAFAF7;
+  --brand-paper-warm: #F5F3ED;
+
+  --brand-sprout: oklch(0.58 0.10 145);
+  --brand-sprout-soft: oklch(0.95 0.03 145);
+  --brand-sprout-faint: oklch(0.97 0.02 145);
+
+  --brand-danger: oklch(0.55 0.15 25);
+  --brand-danger-soft: oklch(0.96 0.03 25);
+  --brand-warn: oklch(0.65 0.13 60);
+  --brand-warn-soft: oklch(0.97 0.04 60);
+
+  // Brand typography
+  --font-sans: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  --font-serif: "Noto Serif SC", "Songti SC", "Source Han Serif SC", serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 }
 
 // ---------------------------------------------------------------
@@ -51,11 +79,14 @@
   --surface-hover: #2a2a2a;
   --surface-active: #333333;
   --surface-inverse: #ffffff;
+  --surface-card: #141414;
 
   // Text
   --text-primary: #f0f0f0;
+  --text-body: #c8c8c5;
   --text-secondary: #a3a3a3;
   --text-tertiary: #666666;
+  --text-faint: #4a4a4a;
   --text-inverse: #0a0a0a;
   --text-placeholder: #4a4a4a;
 
@@ -63,6 +94,8 @@
   --border-light: #2a2a2a;
   --border-medium: #3a3a3a;
   --border-heavy: #555555;
+  --border-hair: #2a2a2a;
+  --border-hair-soft: #1e1e1e;
 
   // Shadows
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -77,6 +110,22 @@
   // Scrollbar
   --scrollbar-thumb: #3a3a3a;
   --scrollbar-thumb-hover: #555555;
+
+  // Brand — flipped for dark theme
+  // ink ↔ paper swap so "strong-bg + inverse-text" buttons stay high-contrast.
+  --brand-ink: #F0F0F0;
+  --brand-ink-soft: #D4D4D0;
+  --brand-paper: #0a0a0a;
+  --brand-paper-warm: #141414;
+
+  // Soft tints — deep low-chroma backgrounds for dark surfaces.
+  --brand-sprout: oklch(0.72 0.13 145);
+  --brand-sprout-soft: oklch(0.24 0.05 145);
+  --brand-sprout-faint: oklch(0.18 0.03 145);
+  --brand-danger: oklch(0.68 0.16 25);
+  --brand-danger-soft: oklch(0.24 0.06 25);
+  --brand-warn: oklch(0.75 0.13 60);
+  --brand-warn-soft: oklch(0.24 0.05 60);
 }
 
 // ---------------------------------------------------------------
@@ -114,9 +163,30 @@ $status-warning: #eab308;
 $status-danger: #ef4444;
 $status-info: #737373;
 
-// Typography
-$font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-$font-mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+// Typography (阅芽 brand stack)
+$font-family: var(--font-sans);
+$font-sans: var(--font-sans);
+$font-serif: var(--font-serif);
+$font-mono: var(--font-mono);
+
+// Brand SCSS aliases
+$brand-ink: var(--brand-ink);
+$brand-ink-soft: var(--brand-ink-soft);
+$brand-paper: var(--brand-paper);
+$brand-paper-warm: var(--brand-paper-warm);
+$brand-sprout: var(--brand-sprout);
+$brand-sprout-soft: var(--brand-sprout-soft);
+$brand-sprout-faint: var(--brand-sprout-faint);
+$brand-danger: var(--brand-danger);
+$brand-danger-soft: var(--brand-danger-soft);
+$brand-warn: var(--brand-warn);
+$brand-warn-soft: var(--brand-warn-soft);
+
+$text-body: var(--text-body);
+$text-faint: var(--text-faint);
+$border-hair: var(--border-hair);
+$border-hair-soft: var(--border-hair-soft);
+$surface-card: var(--surface-card);
 
 $font-size-xs: 11px;
 $font-size-sm: 13px;

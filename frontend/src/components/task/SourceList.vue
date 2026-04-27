@@ -1,3 +1,9 @@
+<!--
+  Copyright (C) 2026 Leazoot
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  This file is part of ReadBud, licensed under the GNU AGPL v3.
+  See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+-->
 <template>
   <div class="source-list">
     <el-collapse v-model="expandedIds" class="source-collapse">
@@ -45,7 +51,7 @@
               <el-progress
                 :percentage="source.relevance_score"
                 :stroke-width="8"
-                color="#5B8DEF"
+                color="#0a0a0a"
                 :show-text="true"
                 :format="(val: number) => `${val}`"
               />
@@ -105,9 +111,9 @@ function sourceTypeBadge(type: string): '' | 'success' | 'warning' | 'danger' | 
 }
 
 function hotScoreColor(score: number): string {
-  if (score >= 80) return '#FF4D4F'
-  if (score >= 50) return '#FAAD14'
-  return '#52C41A'
+  if (score >= 80) return '#ef4444'
+  if (score >= 50) return '#eab308'
+  return '#22c55e'
 }
 
 function formatDate(dateStr: string): string {
@@ -120,9 +126,10 @@ function formatDate(dateStr: string): string {
 .source-list {
   display: flex;
   flex-direction: column;
-  gap: $spacing-md;
+  gap: 12px;
 }
 
+// Collapse overrides
 .source-collapse {
   border: none;
 
@@ -131,9 +138,9 @@ function formatDate(dateStr: string): string {
     line-height: normal;
     background: transparent;
     border: none;
-    padding: $spacing-xs 0;
-    font-size: $font-size-xs;
-    color: $color-accent;
+    padding: 6px 0;
+    font-size: 12px;
+    color: #525252;
   }
 
   :deep(.el-collapse-item__wrap) {
@@ -143,34 +150,41 @@ function formatDate(dateStr: string): string {
 
   :deep(.el-collapse-item__content) {
     padding-bottom: 0;
+    color: #525252;
+  }
+
+  :deep(.el-collapse-item__arrow) {
+    color: #d4d4d4;
   }
 }
 
+// Source card
 .source-card {
-  padding: $spacing-md;
-  border: 1px solid $color-border;
-  border-radius: $radius-base;
-  background: $color-card-bg;
-  margin-bottom: $spacing-sm;
-  transition: box-shadow $transition-fast;
+  padding: 14px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  background: var(--surface-card);
+  margin-bottom: 8px;
+  transition: all 0.15s ease;
 
   &:hover {
-    box-shadow: $shadow-card-hover;
+    border-color: #0a0a0a;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   }
 }
 
 .source-title-row {
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
-  margin-bottom: $spacing-sm;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .source-title {
   flex: 1;
-  font-size: $font-size-base;
-  font-weight: $font-weight-medium;
-  color: $color-text-primary;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a1a;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -179,75 +193,92 @@ function formatDate(dateStr: string): string {
 .external-link {
   display: flex;
   align-items: center;
-  color: $color-text-muted;
-  transition: color $transition-fast;
+  color: #d4d4d4;
+  transition: color 0.15s ease;
 
   &:hover {
-    color: $color-accent;
+    color: #0a0a0a;
   }
 }
 
 .source-meta {
   display: flex;
   align-items: center;
-  gap: $spacing-md;
-  font-size: $font-size-xs;
-  color: $color-text-muted;
-  margin-bottom: $spacing-md;
+  gap: 12px;
+  font-size: 12px;
+  color: #d4d4d4;
+  margin-bottom: 12px;
 }
 
 .score-bars {
   display: flex;
-  gap: $spacing-lg;
+  gap: 20px;
 }
 
 .score-item {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
+  gap: 8px;
 
   .score-label {
-    font-size: $font-size-xs;
-    color: $color-text-secondary;
+    font-size: 12px;
+    color: #525252;
     white-space: nowrap;
   }
 
   :deep(.el-progress) {
     flex: 1;
   }
+
+  :deep(.el-progress-bar__outer) {
+    background-color: #e8e8e8 !important;
+  }
+
+  :deep(.el-progress__text) {
+    color: #525252 !important;
+    font-size: 12px !important;
+  }
 }
 
 .source-summary {
-  font-size: $font-size-sm;
-  color: $color-text-secondary;
-  line-height: $line-height-relaxed;
+  font-size: 13px;
+  color: #525252;
+  line-height: 1.6;
   margin: 0;
-  padding: $spacing-sm 0;
+  padding: 8px 0;
 }
 
-// Responsive: Mobile — stack score bars, compact layout
-@media (max-width: $breakpoint-sm) {
+// Tag overrides
+:deep(.el-tag) {
+  border-radius: 4px !important;
+  border: none !important;
+}
+:deep(.el-tag--info) { background: #f5f5f5 !important; color: #525252 !important; }
+:deep(.el-tag--success) { background: #f0fdf4 !important; color: #16a34a !important; }
+:deep(.el-tag--warning) { background: #fefce8 !important; color: #ca8a04 !important; }
+
+@media (max-width: 768px) {
   .source-card {
-    padding: $spacing-sm;
+    padding: 10px;
   }
 
   .source-title-row {
-    gap: $spacing-xs;
+    gap: 6px;
   }
 
   .source-title {
-    font-size: $font-size-sm;
+    font-size: 13px;
   }
 
   .source-meta {
-    gap: $spacing-sm;
+    gap: 8px;
     flex-wrap: wrap;
   }
 
   .score-bars {
     flex-direction: column;
-    gap: $spacing-sm;
+    gap: 8px;
   }
 }
 </style>

@@ -1,6 +1,8 @@
 # Go
 backend/bin/
 backend/tmp/
+backend/api
+backend/worker
 *.exe
 *.exe~
 *.dll
@@ -48,4 +50,20 @@ coverage/
 parse_issues.js
 
 # Data directories
-/data/images/
+/data/
+
+# Local config (use config.example.yaml as template)
+backend/configs/config.yaml
+
+# AI assistant / IDE tooling artifacts
+.claude/
+.superpowers/
+.cursor/
+.aider*
+.linear_project.json
+CLAUDE.md
+GEMINI.md
+AGENTS.md
+
+# Internal docs (not part of the published project)
+/docs/

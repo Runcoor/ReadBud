@@ -1,7 +1,13 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 // Brand profile and style profile type definitions
 
 export interface BrandProfileVO {
-  id: string
+  id: number
+  public_id: string
   name: string
   brand_tone: string
   forbidden_words: string[]

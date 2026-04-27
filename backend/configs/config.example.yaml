@@ -1,0 +1,37 @@
+# ReadBud — example configuration.
+# Copy this file to config.yaml and fill in real values for your environment.
+# config.yaml is gitignored; do NOT commit secrets.
+
+server:
+  port: 19881
+  mode: debug  # debug | release
+
+database:
+  host: localhost
+  port: 15432
+  user: readbud
+  password: CHANGE_ME       # postgres password
+  dbname: readbud
+  sslmode: disable
+  max_open_conns: 25
+  max_idle_conns: 10
+  conn_max_lifetime: 300    # seconds
+
+redis:
+  addr: localhost:16379
+  password: ""
+  db: 0
+
+storage:
+  provider: local           # local | (future: s3, oss)
+  root_dir: ./data/images
+  public_base: /static/images
+
+jwt:
+  secret: CHANGE_ME_TO_A_RANDOM_64_CHAR_STRING   # also used to derive secret-encryption key
+  expiry: 24                # hours
+
+log:
+  level: debug              # debug | info | warn | error
+  output: stdout            # stdout | file
+  file_path: logs/readbud.log

@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 package postgres
 
 import (
@@ -15,6 +20,7 @@ type WechatAccountRepository interface {
 	List(ctx context.Context) ([]domain.WechatAccount, error)
 	FindByID(ctx context.Context, id int64) (*domain.WechatAccount, error)
 	FindByPublicID(ctx context.Context, publicID string) (*domain.WechatAccount, error)
+	FindByAppID(ctx context.Context, appID string) (*domain.WechatAccount, error)
 	FindDefault(ctx context.Context) (*domain.WechatAccount, error)
 	Create(ctx context.Context, acct *domain.WechatAccount) error
 	Update(ctx context.Context, acct *domain.WechatAccount) error
@@ -56,6 +62,17 @@ func (r *wechatAccountRepo) FindByPublicID(ctx context.Context, publicID string)
 			return nil, nil
 		}
 		return nil, fmt.Errorf("wechatAccountRepo.FindByPublicID: %w", err)
+	}
+	return &acct, nil
+}
+
+func (r *wechatAccountRepo) FindByAppID(ctx context.Context, appID string) (*domain.WechatAccount, error) {
+	var acct domain.WechatAccount
+	if err := r.db.WithContext(ctx).Where("app_id = ?", appID).First(&acct).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("wechatAccountRepo.FindByAppID: %w", err)
 	}
 	return &acct, nil
 }

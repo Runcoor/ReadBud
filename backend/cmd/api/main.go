@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 package main
 
 import (
@@ -136,6 +141,9 @@ func main() {
 		publishRecordRepo := postgres.NewPublishRecordRepository(db)
 		assetRepo := postgres.NewAssetRepository(db)
 
+		// Extension token repository (browser plugin auth)
+		extensionTokenRepo := postgres.NewExtensionTokenRepository(db)
+
 		// Metrics repository
 		metricsRepo := postgres.NewMetricsSnapshotRepository(db)
 
@@ -156,12 +164,24 @@ func main() {
 		brandRepo := postgres.NewBrandProfileRepository(db)
 		styleRepo := postgres.NewStyleProfileRepository(db)
 
-		// Stub adapters for development (used as fallbacks)
-		stubPublisher := wechat.NewStubWeChatPublisher(logger.L)
-		stubTokenProv := wechat.NewStubTokenProvider()
-		stubMetricsSync := wechat.NewStubMetricsSyncProvider(logger.L)
+		// Stub adapters for development (used as fallbacks for non-WeChat providers).
 		stubLLM := llm.NewStubLLMProvider(logger.L)
 		stubImageGen := imageStub.NewStubImageGenProvider(logger.L)
+
+		// WeChat: production-grade implementations of token, publisher, and metrics sync.
+		tokenRedis := sse.NewRedisClient(redisAddr, redisPassword, redisDB)
+		wechatEncKey := crypto.DeriveKey(encSecret)
+		tokenProv, err := wechat.NewRealTokenProvider(wechat.RealTokenProviderConfig{
+			Resolver:  wechat.NewDBAccountResolver(wechatRepo, wechatEncKey),
+			Persister: wechat.NewRepoAccountPersister(wechatRepo),
+			Cache:     wechat.NewRedisTokenCache(tokenRedis, ""),
+			Logger:    logger.L,
+		})
+		if err != nil {
+			log.Fatalf("init wechat token provider: %v", err)
+		}
+		wechatPublisher := wechat.NewRealWeChatPublisher(nil, logger.L)
+		wechatMetricsSync := wechat.NewRealMetricsSyncProvider(nil, logger.L)
 
 		// Asynq client for task queue
 		asynqClient := asynq.NewClient(asynq.RedisClientOpt{
@@ -178,13 +198,15 @@ func main() {
 		providerFactory := integration.NewProviderFactory(providerSvc, logger.L)
 		lazyLLM := integration.NewLazyLLMProvider(providerFactory, stubLLM)
 		lazyImageGen := integration.NewLazyImageGenProvider(providerFactory, stubImageGen)
-		_ = lazyImageGen // available for future injection
 		wechatSvc := service.NewWechatAccountService(wechatRepo, encSecret)
 		taskSvc := service.NewTaskService(taskRepo, draftRepo, sseHub, asynqClient, brandRepo)
-		draftSvc := service.NewDraftService(draftRepo, blockRepo, sourceRepo, taskRepo)
-		contentImageSvc := service.NewContentImageService(assetRepo, stubPublisher, storageProvider, stubTokenProv, logger.L)
-		publishSvc := service.NewPublishService(publishJobRepo, publishRecordRepo, stubPublisher, stubTokenProv, contentImageSvc, logger.L)
-		metricsSvc := service.NewMetricsService(metricsRepo, publishRecordRepo, stubMetricsSync, stubTokenProv, logger.L)
+		draftSvc := service.NewDraftService(draftRepo, blockRepo, sourceRepo, taskRepo, assetRepo, storageProvider)
+		coverImageSvc := service.NewCoverImageService(draftRepo, assetRepo, lazyImageGen, storageProvider, logger.L)
+		contentImageSvc := service.NewContentImageService(assetRepo, wechatPublisher, storageProvider, tokenProv, logger.L)
+		wechatPackageSvc := service.NewWechatPackageService(draftRepo, assetRepo, storageProvider, logger.L)
+		extensionTokenSvc := service.NewExtensionTokenService(extensionTokenRepo)
+		publishSvc := service.NewPublishService(publishJobRepo, publishRecordRepo, draftRepo, wechatRepo, wechatPublisher, tokenProv, contentImageSvc, coverImageSvc, logger.L)
+		metricsSvc := service.NewMetricsService(metricsRepo, publishRecordRepo, wechatMetricsSync, tokenProv, logger.L)
 		topicLibrarySvc := service.NewTopicLibraryService(topicLibraryRepo, taskRepo, metricsRepo, logger.L)
 		distributionSvc := service.NewDistributionService(distributionRepo, draftRepo, blockRepo, lazyLLM, logger.L)
 		draftVersionSvc := service.NewDraftVersionService(draftVersionRepo, draftRepo, blockRepo, citationRepo)
@@ -198,7 +220,8 @@ func main() {
 		providerHandler := apiHTTP.NewProviderHandler(providerSvc, providerFactory, logger.L)
 		wechatHandler := apiHTTP.NewWechatHandler(wechatSvc)
 		taskHandler := apiHTTP.NewTaskHandler(taskSvc)
-		draftHandler := apiHTTP.NewDraftHandler(draftSvc)
+		draftHandler := apiHTTP.NewDraftHandler(draftSvc, coverImageSvc, wechatPackageSvc)
+		extensionTokenHandler := apiHTTP.NewExtensionTokenHandler(extensionTokenSvc)
 		sourceHandler := apiHTTP.NewSourceHandler(draftSvc)
 		publishHandler := apiHTTP.NewPublishHandler(publishSvc, draftRepo, wechatRepo)
 		metricsHandler := apiHTTP.NewMetricsHandler(metricsSvc, wechatRepo)
@@ -211,7 +234,7 @@ func main() {
 		// Public routes (no auth required)
 		authHandler.RegisterRoutes(v1)
 
-		// Protected routes
+		// Protected routes — webapp JWT auth.
 		protected := v1.Group("")
 		protected.Use(middleware.JWTAuth(jwtCfg))
 		{
@@ -227,8 +250,18 @@ func main() {
 			draftVersionHandler.RegisterRoutes(protected)
 			reviewRuleHandler.RegisterRoutes(protected)
 			brandHandler.RegisterRoutes(protected)
+			extensionTokenHandler.RegisterRoutes(protected)
 			protected.GET("/tasks/:id/events", sseHub.ServeHTTP("id"))
 			protected.GET("/tasks/:id/sources", sourceHandler.GetTaskSources)
+		}
+
+		// Hybrid-auth routes — accept either JWT (webapp) or extension token (browser plugin).
+		// Currently only /drafts/:id/wechat-package, which the extension fetches before
+		// auto-filling the WeChat editor.
+		hybrid := v1.Group("")
+		hybrid.Use(middleware.CombinedAuth(extensionTokenSvc, middleware.JWTAuth(jwtCfg)))
+		{
+			draftHandler.RegisterPackageRoute(hybrid)
 		}
 	} else {
 		// Fallback when DB is unavailable

@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 package http
 
 import (
@@ -39,6 +44,7 @@ func (h *PublishHandler) RegisterRoutes(rg *gin.RouterGroup) {
 		publish.GET("/:id", h.GetJob)
 		publish.POST("/:id/cancel", h.CancelJob)
 		publish.POST("/:id/retry", h.RetryJob)
+		publish.POST("/:id/fulfilled", h.MarkFulfilled)
 	}
 }
 
@@ -70,13 +76,23 @@ func (h *PublishHandler) CreateJob(c *gin.Context) {
 		return
 	}
 
-	apiPkg.Created(c, gin.H{
-		"id":           job.PublicID,
-		"draft_id":     req.DraftID,
-		"publish_mode": job.PublishMode,
-		"status":       job.Status,
-		"created_at":   job.CreatedAt.Format("2006-01-02T15:04:05Z"),
-	})
+	resp := gin.H{
+		"id":            job.PublicID,
+		"draft_id":      req.DraftID,
+		"publish_mode":  job.PublishMode,
+		"status":        job.Status,
+		"delivery_mode": wa.DeliveryMode,
+		"created_at":    job.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+	// For non-API delivery, hand the frontend a deeplink it can open in a new
+	// tab. The plugin reads ?readbud_draft=<id>&readbud_job=<id> off the URL,
+	// fetches /drafts/:id/wechat-package, and fills the editor.
+	if wa.DeliveryMode == "extension" || wa.DeliveryMode == "manual" {
+		resp["editor_url"] = "https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit_v2&action=edit&type=77" +
+			"&readbud_draft=" + req.DraftID +
+			"&readbud_job=" + job.PublicID
+	}
+	apiPkg.Created(c, resp)
 }
 
 // GetJob handles GET /api/v1/publish/jobs/:id.
@@ -131,6 +147,32 @@ func (h *PublishHandler) RetryJob(c *gin.Context) {
 		return
 	}
 
+	apiPkg.OK(c, gin.H{
+		"id":     job.PublicID,
+		"status": job.Status,
+	})
+}
+
+// MarkFulfilled handles POST /api/v1/publish/jobs/:id/fulfilled.
+// Used by the browser extension (or the user clicking "已发布" in manual mode)
+// to flip awaiting_extension/awaiting_manual -> success and optionally record
+// the published article URL.
+func (h *PublishHandler) MarkFulfilled(c *gin.Context) {
+	publicID := c.Param("id")
+	var req struct {
+		ArticleURL string `json:"article_url" binding:"omitempty,max=2000"`
+	}
+	_ = c.ShouldBindJSON(&req) // body is optional
+
+	job, err := h.publishService.MarkExtensionFulfilled(c.Request.Context(), publicID, req.ArticleURL)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			apiPkg.NotFound(c, "发布任务不存在")
+			return
+		}
+		apiPkg.BadRequest(c, err.Error())
+		return
+	}
 	apiPkg.OK(c, gin.H{
 		"id":     job.PublicID,
 		"status": job.Status,

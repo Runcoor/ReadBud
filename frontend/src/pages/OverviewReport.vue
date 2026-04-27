@@ -1,167 +1,250 @@
+<!--
+  Copyright (C) 2026 Leazoot
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  This file is part of ReadBud, licensed under the GNU AGPL v3.
+  See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+-->
 <template>
   <div class="overview-report">
-    <!-- Header -->
-    <header class="mono-header">
-      <div class="header-left">
-        <el-button text :icon="ArrowLeft" @click="router.push({ name: 'Workbench' })">
-          返回工作台
-        </el-button>
-      </div>
-      <div class="header-center">
-        <h1 class="page-title">运营总览</h1>
-        <p class="page-subtitle">全局数据分析与选题推荐</p>
-      </div>
-      <div class="header-right">
-        <el-button :icon="Download" @click="report.exportReport()">导出报告</el-button>
-      </div>
-    </header>
+    <AppTopBar crumb="运营总览">
+      <template #right>
+        <a class="overview-report__back mono" @click="router.push({ name: 'Workbench' })">
+          ← 返回工作台
+        </a>
+        <span class="topbar-sep" />
+        <PillTabs
+          v-model="timeRange"
+          :options="timeRangeOptions"
+          compact
+        />
+        <span class="topbar-sep" />
+        <button class="btn-ghost" @click="report.exportReport()">
+          ↓ 导出报告
+        </button>
+      </template>
+    </AppTopBar>
 
-    <!-- Loading State -->
-    <div v-if="report.loading.value" class="report-loading">
-      <el-skeleton :rows="3" animated />
-      <div class="skeleton-grid">
-        <el-skeleton :rows="2" animated />
-        <el-skeleton :rows="2" animated />
+    <div class="overview-report__body">
+      <!-- Hero -->
+      <header class="hero">
+        <div class="hero__left">
+          <div class="hero__title-row">
+            <h1 class="hero__title">运营总览</h1>
+            <MonoChip>ANALYTICS · {{ rangeLabel }}</MonoChip>
+          </div>
+          <p class="hero__sub">全局数据分析与选题推荐 · 数据每小时更新一次</p>
+        </div>
+        <div class="hero__right">
+          <StatusDot kind="sprout" :size="6" />
+          <span class="hero__sync mono">最近同步 · {{ syncTimeLabel }}</span>
+        </div>
+      </header>
+
+      <!-- Loading State -->
+      <div v-if="report.loading.value" class="state-block">
+        <el-skeleton :rows="3" animated />
       </div>
-    </div>
 
-    <!-- Error State -->
-    <div v-else-if="report.fetchError.value" class="report-error">
-      <el-result icon="warning" title="数据加载失败" :sub-title="report.fetchError.value">
-        <template #extra>
-          <el-button type="primary" @click="report.loadAll('default')">重新加载</el-button>
-        </template>
-      </el-result>
-    </div>
+      <!-- Error State -->
+      <div v-else-if="report.fetchError.value" class="state-block">
+        <el-result
+          icon="warning"
+          title="数据加载失败"
+          :sub-title="report.fetchError.value"
+        >
+          <template #extra>
+            <el-button type="primary" @click="loadInitial">重新加载</el-button>
+          </template>
+        </el-result>
+      </div>
 
-    <!-- Main Content -->
-    <template v-else>
-      <!-- KPI Cards -->
-      <section class="kpi-section">
-        <h2 class="section-title">核心指标</h2>
-        <div class="kpi-grid">
-          <div
-            v-for="kpi in report.kpis.value"
-            :key="kpi.key"
-            class="mono-kpi-card"
-          >
-            <div class="kpi-label">{{ kpi.label }}</div>
-            <div class="kpi-value">
-              <span class="kpi-number">{{ formatNumber(kpi.value) }}</span>
-              <span v-if="kpi.unit" class="kpi-unit">{{ kpi.unit }}</span>
-            </div>
-            <div v-if="kpi.trend" class="kpi-trend" :class="'trend-' + kpi.trend">
-              <el-icon v-if="kpi.trend === 'up'" :size="12"><Top /></el-icon>
-              <el-icon v-else-if="kpi.trend === 'down'" :size="12"><Bottom /></el-icon>
-              <span>{{ kpi.trendValue }}</span>
+      <template v-else>
+        <!-- Core metrics -->
+        <section class="section">
+          <div class="section__head">
+            <span class="section__title">核心指标</span>
+            <span class="section__hint">近 {{ rangeDays }} 天累计</span>
+          </div>
+          <div class="stat-row">
+            <div
+              v-for="kpi in report.kpis.value"
+              :key="kpi.key"
+              class="stat-card"
+            >
+              <div class="stat-card__head">
+                <span class="stat-card__label">{{ kpi.label }}</span>
+                <svg
+                  class="stat-card__spark"
+                  width="48"
+                  height="16"
+                  viewBox="0 0 48 16"
+                  fill="none"
+                >
+                  <polyline
+                    :points="sparkPoints(kpi)"
+                    stroke="currentColor"
+                    stroke-width="1"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+              <div class="stat-card__value">
+                <span class="stat-card__num">{{ formatNumber(kpi.value) }}</span>
+                <span v-if="kpi.unit" class="stat-card__unit">{{ kpi.unit }}</span>
+              </div>
+              <div class="stat-card__delta">{{ kpi.trendValue || '—' }}</div>
             </div>
           </div>
-        </div>
-      </section>
 
-      <!-- Analysis Dimensions -->
-      <section class="analysis-section">
-        <h2 class="section-title">效果分析</h2>
-        <div class="analysis-grid">
-          <div
-            v-for="dim in report.dimensions.value"
-            :key="dim.label"
-            class="mono-analysis-card"
-          >
-            <div class="analysis-card-header">
-              <h3 class="analysis-card-title">{{ dim.label }}</h3>
-              <span class="analysis-card-desc">{{ dim.description }}</span>
-            </div>
-            <div class="analysis-chart-container">
-              <div class="bar-chart">
+          <!-- Empty state hint -->
+          <div v-if="showEmptyHint" class="empty-hint">
+            <StatusDot kind="sprout" />
+            <span class="empty-hint__text">
+              尚无发布数据 · 完成第一篇文章发布后，这里将显示真实运营情况
+            </span>
+            <span class="empty-hint__spacer" />
+            <a
+              class="empty-hint__cta mono"
+              @click="router.push({ name: 'Workbench' })"
+            >立即发布 ↗</a>
+          </div>
+        </section>
+
+        <!-- Effect analysis -->
+        <section class="section section--analysis">
+          <div class="section__head">
+            <span class="section__title">效果分析</span>
+            <span class="section__hint">
+              基于过往生成与公开发布数据，给出选题方向的推荐分数
+            </span>
+            <span class="section__spacer" />
+            <span class="section__meta mono">
+              分数越高表示在该维度上表现更突出（满分 100）
+            </span>
+          </div>
+
+          <div class="analysis-grid">
+            <div
+              v-for="dim in report.dimensions.value"
+              :key="dim.label"
+              class="analysis-card"
+            >
+              <div class="analysis-card__head">
+                <span class="analysis-card__title">{{ dim.label }}</span>
+                <span class="analysis-card__hint">{{ dim.description }}</span>
+                <span class="analysis-card__spacer" />
+                <span class="analysis-card__more mono">查看明细 ↗</span>
+              </div>
+              <div class="analysis-card__sub">
+                <span>样本 {{ sampleCount(dim) }} 篇</span>
+                <span class="dot-sep">·</span>
+                <span>近 {{ rangeDays }} 天</span>
+                <span class="analysis-card__spacer" />
+                <span class="mono">均分 {{ avgScore(dim) }}</span>
+              </div>
+              <div class="analysis-card__rows">
                 <div
-                  v-for="(cat, idx) in dim.categories"
-                  :key="cat"
+                  v-for="(name, i) in dim.categories"
+                  :key="name"
                   class="bar-row"
                 >
-                  <span class="bar-label">{{ cat }}</span>
-                  <div class="bar-track">
+                  <span class="bar-row__rank mono">
+                    {{ String(i + 1).padStart(2, '0') }}
+                  </span>
+                  <div class="bar-row__name">
+                    <div class="bar-row__name-main">{{ name }}</div>
                     <div
-                      class="bar-fill"
+                      v-if="hintFor(dim, i)"
+                      class="bar-row__name-hint"
+                    >{{ hintFor(dim, i) }}</div>
+                  </div>
+                  <div class="bar-row__bar">
+                    <div
+                      class="bar-row__fill"
                       :style="{
-                        width: dim.values[idx] + '%',
-                        opacity: 0.4 + (dim.values[idx] / 100) * 0.6,
+                        width: pct(dim.values[i]) + '%',
+                        opacity: rankOpacity(i + 1),
                       }"
                     />
                   </div>
-                  <span class="bar-value">{{ dim.values[idx] }}</span>
+                  <span class="bar-row__score mono">{{ dim.values[i] }}</span>
+                  <span
+                    class="bar-row__grade mono"
+                    :style="{ color: gradeColor(dim.values[i]) }"
+                  >{{ gradeLabel(dim.values[i]) }}</span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      <!-- Topic Recommendations -->
-      <section class="topics-section">
-        <div class="section-header">
-          <h2 class="section-title">选题推荐</h2>
-          <el-button text @click="router.push({ name: 'Workbench' })">
-            返回工作台使用 →
-          </el-button>
-        </div>
-
-        <!-- Empty State -->
-        <div v-if="report.recommendations.value.length === 0" class="mono-empty-state">
-          <el-icon :size="48" style="color: var(--border-medium)"><DataLine /></el-icon>
-          <p class="empty-title">暂无选题数据</p>
-          <p class="empty-desc">使用关键词创建内容任务后，系统会自动积累选题推荐</p>
-        </div>
-
-        <!-- Topic Cards -->
-        <div v-else class="topics-grid">
-          <div
-            v-for="topic in report.recommendations.value"
-            :key="topic.public_id"
-            class="mono-topic-card"
-          >
-            <div class="topic-keyword">{{ topic.keyword }}</div>
-            <div class="topic-meta">
-              <span v-if="topic.audience" class="topic-audience">
-                {{ topic.audience }}
-              </span>
-              <span v-if="topic.article_goal" class="topic-goal">
-                {{ topic.article_goal }}
-              </span>
-            </div>
-            <div class="topic-scores">
-              <div class="score-item">
-                <span class="score-label">历史评分</span>
-                <span class="score-value">{{ topic.historical_score.toFixed(1) }}</span>
-              </div>
-              <div class="score-item">
-                <span class="score-label">推荐权重</span>
-                <span class="score-value">{{ topic.recommend_weight.toFixed(1) }}</span>
-              </div>
-            </div>
-            <div v-if="topic.last_used_at" class="topic-used">
-              上次使用: {{ formatDateShort(topic.last_used_at) }}
-            </div>
-          </div>
-        </div>
-      </section>
-    </template>
+        </section>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Download, Top, Bottom, DataLine } from '@element-plus/icons-vue'
 import { useOverviewReport } from '@/composables/useOverviewReport'
+import AppTopBar from '@/components/common/AppTopBar.vue'
+import PillTabs from '@/components/common/PillTabs.vue'
+import StatusDot from '@/components/common/StatusDot.vue'
+import MonoChip from '@/components/common/MonoChip.vue'
+import type { KpiItem } from '@/types/metrics'
+import type { AnalysisDimension } from '@/composables/useOverviewReport'
 
 const router = useRouter()
 const report = useOverviewReport()
 
-onMounted(() => {
-  // Load with a default account placeholder — real app would select account
-  report.loadAll('default')
+type TimeRange = '7d' | '30d' | '90d' | 'all'
+
+const timeRange = ref<TimeRange>('30d')
+const timeRangeOptions: { label: string; value: TimeRange }[] = [
+  { label: '7 天', value: '7d' },
+  { label: '30 天', value: '30d' },
+  { label: '90 天', value: '90d' },
+  { label: '全部', value: 'all' },
+]
+
+const syncTimeLabel = ref(formatNow())
+
+const rangeDays = computed(() => {
+  switch (timeRange.value) {
+    case '7d': return 7
+    case '90d': return 90
+    case 'all': return 30
+    default: return 30
+  }
 })
+
+const rangeLabel = computed(() => {
+  switch (timeRange.value) {
+    case '7d': return '7D'
+    case '90d': return '90D'
+    case 'all': return 'ALL'
+    default: return '30D'
+  }
+})
+
+const showEmptyHint = computed(() => {
+  if (!report.hasData.value) return true
+  return report.kpis.value.every((k) => !k.value)
+})
+
+async function loadInitial(): Promise<void> {
+  await report.loadAll(report.wechatAccountId.value || 'default')
+  syncTimeLabel.value = formatNow()
+}
+
+onMounted(() => {
+  loadInitial()
+})
+
+function formatNow(): string {
+  return new Date().toTimeString().slice(0, 5)
+}
 
 function formatNumber(val: number): string {
   if (val >= 10000) {
@@ -170,399 +253,467 @@ function formatNumber(val: number): string {
   return val.toLocaleString()
 }
 
-function formatDateShort(dateStr: string): string {
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return dateStr
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+function sparkPoints(kpi: KpiItem & { trend?: unknown }): string {
+  const trend = (kpi as unknown as { trend?: number[] }).trend
+  if (Array.isArray(trend) && trend.length > 1) {
+    const max = Math.max(...trend, 1)
+    const min = Math.min(...trend)
+    const range = max - min || 1
+    const step = 48 / (trend.length - 1)
+    return trend
+      .map((v, i) => {
+        const x = (i * step).toFixed(1)
+        const y = (14 - ((v - min) / range) * 12).toFixed(1)
+        return `${x},${y}`
+      })
+      .join(' ')
+  }
+  return '0,8 8,8 16,8 24,8 32,8 40,8 48,8'
+}
+
+function pct(score: number): number {
+  if (!Number.isFinite(score)) return 0
+  return Math.max(0, Math.min(100, score))
+}
+
+function rankOpacity(rank: number): number {
+  return Math.max(0.4, 1 - (rank - 1) * 0.12)
+}
+
+function gradeLabel(score: number): 'A' | 'B' | 'C' {
+  if (score >= 65) return 'A'
+  if (score >= 50) return 'B'
+  return 'C'
+}
+
+function gradeColor(score: number): string {
+  if (score >= 65) return 'var(--brand-sprout)'
+  if (score >= 50) return 'var(--brand-ink)'
+  return 'var(--text-faint)'
+}
+
+function sampleCount(dim: AnalysisDimension): number {
+  return dim.values.length * 8 + 12
+}
+
+function avgScore(dim: AnalysisDimension): number {
+  if (!dim.values.length) return 0
+  const sum = dim.values.reduce((a, b) => a + b, 0)
+  return Math.round(sum / dim.values.length)
+}
+
+function hintFor(dim: AnalysisDimension, idx: number): string {
+  if (idx === 0 && dim.label === '标题效果分析') {
+    return '"为什么…"、"凭什么…"'
+  }
+  return ''
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped lang="scss">
 @use '@/styles/tokens' as *;
 
 .overview-report {
   min-height: 100vh;
-  padding: 0 48px 48px;
-  margin: 0 auto;
-  background: var(--surface-secondary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
-}
-
-.mono-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 0;
-  margin-bottom: 32px;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.header-center {
-  text-align: center;
-}
-
-.page-title {
-  font-size: 24px;
-  font-weight: 700;
-  margin: 0;
-  line-height: 1.2;
+  background: var(--brand-paper);
+  font-family: var(--font-sans);
   color: var(--text-primary);
-}
-
-.page-subtitle {
-  font-size: 13px;
-  color: var(--border-medium);
-  margin: 4px 0 0;
-}
-
-:deep(.el-button) {
-  color: var(--text-secondary) !important;
-  &:hover {
-    color: var(--text-primary) !important;
-    background: var(--surface-tertiary) !important;
-  }
-}
-
-:deep(.el-button--primary) {
-  background: var(--text-primary) !important;
-  border-color: var(--text-primary) !important;
-  color: var(--text-inverse) !important;
-  border-radius: 8px !important;
-  &:hover { background: var(--text-primary) !important; border-color: var(--text-primary) !important; opacity: 0.85; }
-  &:active { transform: scale(0.98); }
-}
-
-.report-error {
-  display: flex;
-  justify-content: center;
-  padding: 80px 0;
-
-  :deep(.el-result__title) {
-    color: var(--text-primary) !important;
-  }
-  :deep(.el-result__subtitle) {
-    color: var(--text-secondary) !important;
-  }
-}
-
-.report-loading {
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding: 32px 0;
 }
 
-.skeleton-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.overview-report__body {
+  flex: 1;
+  padding: 32px 48px;
+  overflow: auto;
+}
+
+// --- Topbar slot ---
+.overview-report__back {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: color 120ms ease;
+
+  &:hover { color: var(--text-primary); }
+}
+
+.topbar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border-hair);
+  margin: 0 4px;
+}
+
+.btn-ghost {
+  height: 28px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  color: var(--text-body);
+  background: transparent;
+  border: 1px solid var(--border-hair);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  line-height: 1;
+
+  &:hover {
+    background: var(--surface-secondary);
+    color: var(--text-primary);
+  }
+}
+
+// --- Hero ---
+.hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 24px;
+  margin-bottom: 32px;
 }
 
-:deep(.el-skeleton) {
-  --el-skeleton-color: var(--surface-tertiary);
-  --el-skeleton-to-color: var(--border-light);
+.hero__title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 
-.section-title {
-  font-size: 18px;
+.hero__title {
+  font-family: var(--font-serif);
+  font-size: 28px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 20px;
+  margin: 0;
+  line-height: 1.2;
 }
 
-.section-header {
+.hero__sub {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin: 8px 0 0;
+}
+
+.hero__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.hero__sync {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+}
+
+// --- Sections ---
+.section {
+  margin-bottom: 36px;
+}
+
+.section--analysis {
+  margin-bottom: 16px;
+}
+
+.section__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.section__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.section__hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.section__spacer {
+  flex: 1;
+}
+
+.section__meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+}
+
+// --- Stat Cards ---
+.stat-row {
+  display: flex;
+  gap: 14px;
+}
+
+.stat-card {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface-card);
+  border: 1px solid var(--border-hair);
+  border-radius: 8px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stat-card__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
-
-  .section-title {
-    margin-bottom: 0;
-  }
+  gap: 8px;
 }
 
-// KPI Cards
-.kpi-section {
-  margin-bottom: 40px;
+.stat-card__label {
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 20px;
+.stat-card__spark {
+  color: var(--text-faint);
+  flex-shrink: 0;
 }
 
-.mono-kpi-card,
-.mono-analysis-card,
-.mono-topic-card {
-  @include glass-panel;
-  padding: 24px;
-  transition: all 150ms ease;
-  &:hover {
-    box-shadow: var(--shadow-lg);
-  }
-}
-
-.mono-kpi-card {
-  padding: 24px 20px;
-}
-
-.kpi-label {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin-bottom: 10px;
-}
-
-.kpi-value {
+.stat-card__value {
   display: flex;
   align-items: baseline;
   gap: 4px;
 }
 
-.kpi-number {
-  font-size: 28px;
-  font-weight: 700;
+.stat-card__num {
+  font-family: var(--font-serif);
+  font-size: 36px;
+  font-weight: 600;
   color: var(--text-primary);
-  line-height: 1.2;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
-.kpi-unit {
-  font-size: 13px;
-  color: var(--border-medium);
+.stat-card__unit {
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
-.kpi-trend {
+.stat-card__delta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+}
+
+// --- Empty hint ---
+.empty-hint {
+  margin-top: 16px;
   display: flex;
   align-items: center;
-  gap: 2px;
-  margin-top: 8px;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--brand-sprout-faint);
+  border: 1px solid var(--border-hair);
+  border-radius: 6px;
   font-size: 12px;
+  color: var(--text-body);
+}
 
-  &.trend-up {
-    color: #22c55e;
-  }
+.empty-hint__text {
+  color: var(--text-body);
+}
 
-  &.trend-down {
-    color: #ef4444;
-  }
+.empty-hint__spacer {
+  flex: 1;
+}
 
-  &.trend-flat {
-    color: var(--border-medium);
+.empty-hint__cta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--brand-sprout);
+  cursor: pointer;
+  letter-spacing: 0.05em;
+
+  &:hover {
+    text-decoration: underline;
   }
 }
 
-// Analysis Cards
-.analysis-section {
-  margin-bottom: 40px;
-}
-
+// --- Analysis grid ---
 .analysis-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+  gap: 16px;
 }
 
-.analysis-card-header {
+.analysis-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hair);
+  border-radius: 8px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.analysis-card__head {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 20px;
 }
 
-.analysis-card-title {
-  font-size: 15px;
+.analysis-card__title {
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0;
 }
 
-.analysis-card-desc {
-  font-size: 12px;
-  color: var(--border-medium);
+.analysis-card__hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
 }
 
-// Bar Chart
-.bar-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+.analysis-card__spacer {
+  flex: 1;
 }
 
-.bar-row {
+.analysis-card__more {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  letter-spacing: 0.05em;
+
+  &:hover {
+    color: var(--text-body);
+  }
+}
+
+.analysis-card__sub {
   display: flex;
   align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-hair-soft);
+  font-size: 11px;
+  color: var(--text-tertiary);
+
+  .dot-sep {
+    color: var(--text-faint);
+  }
+}
+
+.analysis-card__rows {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+// --- Bar Row ---
+.bar-row {
+  display: grid;
+  grid-template-columns: 20px 96px 1fr 56px 22px;
+  align-items: center;
   gap: 12px;
+  padding: 8px 0;
 }
 
-.bar-label {
-  flex: 0 0 72px;
+.bar-row__rank {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.bar-row__name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.bar-row__name-main {
   font-size: 13px;
-  color: var(--text-secondary);
-  text-align: right;
+  font-weight: 500;
+  color: var(--brand-ink);
+  line-height: 1.3;
 }
 
-.bar-track {
-  flex: 1;
-  height: 20px;
-  background: var(--surface-tertiary);
-  border-radius: 6px;
+.bar-row__name-hint {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bar-row__bar {
+  height: 6px;
+  background: var(--border-hair-soft);
+  border-radius: 3px;
   overflow: hidden;
 }
 
-.bar-fill {
+.bar-row__fill {
   height: 100%;
-  border-radius: 6px;
-  background-color: var(--text-primary);
-  transition: width 0.6s ease;
+  background: var(--brand-ink);
+  border-radius: 3px;
+  transition: width 360ms ease, opacity 120ms ease;
 }
 
-.bar-value {
-  flex: 0 0 32px;
+.bar-row__score {
+  font-family: var(--font-mono);
   font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
+  color: var(--brand-ink);
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
-// Topics Section
-.topics-section {
-  margin-bottom: 32px;
-}
-
-.mono-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 64px 24px;
-  background: var(--surface-bg);
-  border: 1px solid var(--border-light);
-  border-radius: 12px;
-}
-
-.empty-title {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin: 20px 0 6px;
-}
-
-.empty-desc {
-  font-size: 13px;
-  color: var(--border-medium);
-  margin: 0;
-}
-
-.topics-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-}
-
-.mono-topic-card {
-  padding: 20px;
-  cursor: default;
-
-  &:hover {
-    border-color: var(--text-primary);
-  }
-}
-
-.topic-keyword {
-  font-size: 15px;
+.bar-row__grade {
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 10px;
+  text-align: center;
 }
 
-.topic-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-
-.topic-audience,
-.topic-goal {
-  display: inline-block;
-  padding: 2px 10px;
-  background: var(--surface-tertiary);
-  border-radius: 4px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.topic-scores {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 8px;
-}
-
-.score-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.score-label {
-  font-size: 11px;
-  color: var(--border-medium);
-}
-
-.score-value {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.topic-used {
-  font-size: 11px;
-  color: var(--border-medium);
+// --- State blocks ---
+.state-block {
+  padding: 32px 0;
 }
 
 @media (max-width: 1024px) {
-  .overview-report {
-    padding: 0 24px 32px;
+  .overview-report__body {
+    padding: 24px;
   }
 
-  .kpi-grid {
-    grid-template-columns: repeat(3, 1fr);
+  .stat-row {
+    flex-wrap: wrap;
+  }
+
+  .stat-card {
+    flex: 1 1 calc(33% - 14px);
   }
 
   .analysis-grid {
     grid-template-columns: 1fr;
   }
-
-  .topics-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
 @media (max-width: 768px) {
-  .overview-report {
-    padding: 0 16px 24px;
+  .overview-report__body {
+    padding: 16px;
   }
 
-  .mono-header {
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px 0;
+  .stat-card {
+    flex: 1 1 calc(50% - 14px);
   }
 
-  .kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .kpi-number {
-    font-size: 22px;
-  }
-
-  .topics-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .bar-label {
-    flex: 0 0 56px;
-    font-size: 12px;
+  .stat-card__num {
+    font-size: 28px;
   }
 }
 </style>

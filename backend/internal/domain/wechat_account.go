@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 package domain
 
 import "time"
@@ -9,6 +14,7 @@ type WechatAccount struct {
 	AppID             string     `gorm:"type:varchar(64);not null" json:"app_id"`
 	AppSecretEnc      string     `gorm:"type:text;not null" json:"-"`
 	TokenMode         string     `gorm:"type:varchar(32);not null;default:'direct'" json:"token_mode"`
+	DeliveryMode      string     `gorm:"type:varchar(32);not null;default:'extension'" json:"delivery_mode"`
 	StableAccessToken *string    `gorm:"type:text" json:"-"`
 	TokenExpireAt     *time.Time `gorm:"type:timestamptz" json:"token_expire_at,omitempty"`
 	GatewayUserAPIID  *string    `gorm:"type:varchar(128)" json:"gateway_user_api_id,omitempty"`
@@ -24,7 +30,17 @@ func (WechatAccount) TableName() string {
 
 // Token mode constants.
 const (
-	TokenModeDirect   = "direct"
-	TokenModeStable   = "stable"
-	TokenModeGateway  = "gateway_v2"
+	TokenModeDirect  = "direct"
+	TokenModeStable  = "stable"
+	TokenModeGateway = "gateway_v2"
+)
+
+// Delivery mode constants — describes HOW articles reach WeChat:
+//   - api:       direct draft/add + freepublish/submit (requires verified service account)
+//   - extension: browser plugin auto-fills the WeChat editor (works for any account)
+//   - manual:    user copies + pastes into the editor by hand (last resort)
+const (
+	DeliveryModeAPI       = "api"
+	DeliveryModeExtension = "extension"
+	DeliveryModeManual    = "manual"
 )

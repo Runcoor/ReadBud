@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 package task
 
 import (
@@ -84,18 +89,15 @@ const (
 	PublishModeSchedule = "schedule"
 )
 
-// Article style constants.
+// Article style constants. The pipeline ships three production presets, each
+// modeled on a finalized HTML reference design.
 const (
-	StyleMinimal   = "minimal"
-	StyleMagazine  = "magazine"
-	StyleListicle  = "listicle"
-	StyleNarrative = "narrative"
-	StyleFAQ       = "faq"
-	StyleCasual    = "casual"
+	StyleMinimal  = "minimal"  // 极简专业：黑白底色 + 荧光黄高亮
+	StyleMagazine = "magazine" // 杂志编辑：纸张底色 + 报刊红强调
+	StyleStitch   = "stitch"   // 暖橙手账：米色底 + 暖橙强调
 )
 
 // ValidArticleStyles for validation.
 var ValidArticleStyles = map[string]bool{
-	StyleMinimal: true, StyleMagazine: true, StyleListicle: true,
-	StyleNarrative: true, StyleFAQ: true, StyleCasual: true,
+	StyleMinimal: true, StyleMagazine: true, StyleStitch: true,
 }

@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 // Draft-related type definitions
 
 export interface BlockVO {
@@ -35,6 +40,15 @@ export interface DraftVO {
 export interface TitleCandidate {
   title: string
   type: string
+}
+
+export interface CoverVO {
+  asset_id?: string
+  url: string
+  width?: number
+  height?: number
+  is_ai_generated: boolean
+  prompt?: string
 }
 
 export interface SourceVO {

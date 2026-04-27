@@ -1,3 +1,9 @@
+<!--
+  Copyright (C) 2026 Leazoot
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  This file is part of ReadBud, licensed under the GNU AGPL v3.
+  See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+-->
 <template>
   <div class="publish-status-card" :class="statusClass">
     <!-- Header Row: status + mode badge -->
@@ -6,7 +12,7 @@
         <span class="status-dot" />
         <span class="status-text">{{ statusLabel }}</span>
       </div>
-      <el-tag :type="modeTagType" size="small" effect="plain">{{ modeLabel }}</el-tag>
+      <el-tag :type="modeTagType" size="small">{{ modeLabel }}</el-tag>
     </div>
 
     <!-- Progress bar for in-progress states -->
@@ -19,7 +25,7 @@
       class="status-progress"
     />
 
-    <!-- Step indicator: queued → submitting → polling → done -->
+    <!-- Step indicator: queued -> submitting -> polling -> done -->
     <div v-if="isInProgress" class="step-indicator">
       <div
         v-for="(step, idx) in steps"
@@ -69,6 +75,28 @@
       </el-button>
     </div>
 
+    <!-- Awaiting extension/manual: user needs to confirm publish completed -->
+    <div v-if="isAwaitingUser" class="awaiting-section">
+      <p class="awaiting-text">
+        {{ job.status === 'awaiting_extension'
+          ? '已打开 WeChat 编辑器。完成填充后,在编辑器里点「群发」。发完后回到这里点下面的按钮。'
+          : '已打开 WeChat 编辑器。请手动粘贴标题/正文/封面后,在编辑器里点「群发」。完成后点下面的按钮。' }}
+      </p>
+      <div class="awaiting-actions">
+        <el-button
+          type="primary"
+          :loading="markingFulfilled"
+          @click="handleMarkFulfilled"
+        >已发布,标记完成</el-button>
+        <el-input
+          v-model="manualArticleURL"
+          placeholder="可选: 粘贴文章链接"
+          size="small"
+          clearable
+        />
+      </div>
+    </div>
+
     <!-- Cancelled -->
     <div v-if="job.status === 'cancelled'" class="cancelled-section">
       <p class="cancelled-text">发布已取消，可重新配置后再次发布</p>
@@ -94,7 +122,7 @@ import {
   CircleCheckFilled, CircleCloseFilled, Link, TopRight,
   RefreshRight, Clock,
 } from '@element-plus/icons-vue'
-import { retryPublishJob } from '@/api/publish'
+import { retryPublishJob, markPublishJobFulfilled } from '@/api/publish'
 import type { PublishJobVO } from '@/api/publish'
 
 interface Props {
@@ -108,6 +136,12 @@ const emit = defineEmits<{
 }>()
 
 const retrying = ref(false)
+const markingFulfilled = ref(false)
+const manualArticleURL = ref('')
+
+const isAwaitingUser = computed(() =>
+  ['awaiting_extension', 'awaiting_manual'].includes(props.job.status),
+)
 
 const steps = [
   { key: 'queued', label: '排队' },
@@ -119,6 +153,8 @@ const STATUS_LABELS: Record<string, string> = {
   queued: '排队中',
   submitting: '正在提交',
   polling: '等待平台审核',
+  awaiting_extension: '等待插件填充',
+  awaiting_manual: '等待手动复制',
   success: '发布成功',
   failed: '发布失败',
   cancelled: '已取消',
@@ -169,6 +205,21 @@ function formatTime(iso: string): string {
   }
 }
 
+async function handleMarkFulfilled(): Promise<void> {
+  markingFulfilled.value = true
+  try {
+    const resp = await markPublishJobFulfilled(props.job.id, manualArticleURL.value || undefined)
+    if (resp.code === 0) {
+      ElMessage.success('已标记为发布完成')
+      emit('update', resp.data)
+    }
+  } catch {
+    ElMessage.error('标记失败,请稍后重试')
+  } finally {
+    markingFulfilled.value = false
+  }
+}
+
 async function handleRetry(): Promise<void> {
   retrying.value = true
   try {
@@ -188,33 +239,32 @@ async function handleRetry(): Promise<void> {
 
 <style lang="scss" scoped>
 .publish-status-card {
-  padding: $spacing-base;
-  border-radius: $radius-lg;
-  background-color: $color-bg;
-  border: 1px solid $color-border;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--surface-card);
+  border: 1px solid #e8e8e8;
   display: flex;
   flex-direction: column;
-  gap: $spacing-md;
-  transition: border-color $transition-base;
+  gap: 12px;
+  transition: border-color 0.15s ease;
 
   &--success {
-    border-color: rgba($color-success, 0.3);
-    background-color: rgba($color-success, 0.03);
+    border-color: #bbf7d0;
+    background: #f0fdf4;
   }
 
   &--failed {
-    border-color: rgba($color-error, 0.3);
-    background-color: rgba($color-error, 0.03);
+    border-color: #fecaca;
+    background: #fef2f2;
   }
 
   &--cancelled {
-    border-color: $color-border;
-    background-color: $color-bg;
+    border-color: #e8e8e8;
+    background: #fafafa;
     opacity: 0.75;
   }
 }
 
-// --- Header ---
 .status-header {
   display: flex;
   align-items: center;
@@ -224,184 +274,225 @@ async function handleRetry(): Promise<void> {
 .status-indicator {
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
+  gap: 10px;
 }
 
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: $color-warning;
+  background-color: #eab308;
   flex-shrink: 0;
 
-  .publish-status-card--success & { background-color: $color-success; }
-  .publish-status-card--failed & { background-color: $color-error; }
-  .publish-status-card--cancelled & { background-color: $color-metal; }
+  .publish-status-card--success & { background-color: #22c55e; }
+  .publish-status-card--failed & { background-color: #ef4444; }
+  .publish-status-card--cancelled & { background-color: #d4d4d4; }
 
   .publish-status-card--queued &,
   .publish-status-card--submitting &,
   .publish-status-card--polling & {
     animation: statusPulse 1.5s ease-in-out infinite;
   }
+
+  .publish-status-card--awaiting_extension &,
+  .publish-status-card--awaiting_manual & {
+    background-color: #6366f1;
+    animation: statusPulse 2s ease-in-out infinite;
+  }
 }
 
 .status-text {
-  font-size: $font-size-base;
-  font-weight: $font-weight-semibold;
-  color: $color-text-primary;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0a0a0a;
 }
 
-// --- Progress ---
+// Progress
 .status-progress {
-  margin-top: -$spacing-xs;
+  margin-top: -4px;
+
+  :deep(.el-progress-bar__outer) {
+    background-color: #e8e8e8 !important;
+  }
+
+  :deep(.el-progress-bar__inner) {
+    background: #525252;
+  }
 }
 
-// --- Step Indicator ---
+// Step Indicator
 .step-indicator {
   display: flex;
-  gap: $spacing-lg;
+  gap: 20px;
 }
 
 .step-item {
   display: flex;
   align-items: center;
-  gap: $spacing-xs;
+  gap: 6px;
 }
 
 .step-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background-color: $color-border;
-  transition: all $transition-fast;
+  background-color: #e8e8e8;
+  transition: all 0.15s ease;
 
-  .step-item--active & {
-    background-color: $color-accent;
-  }
-
+  .step-item--active & { background-color: #0a0a0a; }
   .step-item--current & {
-    background-color: $color-accent;
-    box-shadow: 0 0 0 3px rgba($color-accent, 0.2);
+    background-color: #0a0a0a;
+    box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.15);
   }
 }
 
 .step-label {
-  font-size: $font-size-xs;
-  color: $color-text-muted;
-  transition: color $transition-fast;
+  font-size: 12px;
+  color: #d4d4d4;
+  transition: color 0.15s ease;
 
-  .step-item--active & { color: $color-text-secondary; }
-  .step-item--current & { color: $color-accent; font-weight: $font-weight-medium; }
+  .step-item--active & { color: #525252; }
+  .step-item--current & { color: #0a0a0a; font-weight: 500; }
 }
 
-// --- Success ---
+// Success
 .success-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-md 0;
+  gap: 10px;
+  padding: 14px 0;
 }
 
-.success-icon { color: $color-success; }
+.success-icon { color: #22c55e; }
 
 .success-text {
-  font-size: $font-size-sm;
-  color: $color-text-secondary;
+  font-size: 13px;
+  color: #525252;
 }
 
 .article-link {
   display: inline-flex;
   align-items: center;
-  gap: $spacing-xs;
-  padding: $spacing-xs $spacing-md;
-  background-color: $color-card-bg;
-  border: 1px solid $color-border;
-  border-radius: $radius-base;
-  font-size: $font-size-sm;
-  color: $color-accent;
+  gap: 6px;
+  padding: 6px 16px;
+  background: var(--surface-card);
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #0a0a0a;
   text-decoration: none;
-  transition: all $transition-fast;
+  transition: all 0.15s ease;
 
   &:hover {
-    border-color: $color-accent;
-    background-color: rgba($color-accent, 0.04);
+    border-color: #0a0a0a;
   }
 }
 
 .link-external { opacity: 0.5; }
 
 .article-link-pending {
-  font-size: $font-size-xs;
-  color: $color-text-muted;
+  font-size: 12px;
+  color: #d4d4d4;
 }
 
-// --- Failed ---
+// Failed
 .failed-section {
   display: flex;
   flex-direction: column;
-  gap: $spacing-sm;
+  gap: 10px;
 }
 
 .error-message {
   display: flex;
   align-items: flex-start;
-  gap: $spacing-xs;
-  font-size: $font-size-sm;
-  color: $color-error;
-  line-height: $line-height-normal;
+  gap: 6px;
+  font-size: 13px;
+  color: #ef4444;
+  line-height: 1.4;
   word-break: break-all;
 }
 
 .error-icon { flex-shrink: 0; margin-top: 2px; }
 
-.retry-btn {
-  align-self: flex-start;
+.retry-btn { align-self: flex-start; }
+
+:deep(.el-button--primary) {
+  background: #0a0a0a !important;
+  border-color: #0a0a0a !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  &:hover { background: #333 !important; border-color: #333 !important; }
 }
 
-// --- Cancelled ---
-.cancelled-section {
-  padding: $spacing-xs 0;
+// Awaiting (extension / manual)
+.awaiting-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 0;
 }
+
+.awaiting-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #525252;
+  margin: 0;
+}
+
+.awaiting-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// Cancelled
+.cancelled-section { padding: 4px 0; }
 
 .cancelled-text {
-  font-size: $font-size-sm;
-  color: $color-text-muted;
+  font-size: 13px;
+  color: #d4d4d4;
 }
 
-// --- Footer ---
+// Footer
 .status-footer {
   display: flex;
   align-items: center;
-  gap: $spacing-md;
-  padding-top: $spacing-sm;
-  border-top: 1px solid $color-divider;
+  gap: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #e8e8e8;
 }
 
 .meta-item {
   display: inline-flex;
   align-items: center;
-  gap: $spacing-xs;
-  font-size: $font-size-xs;
-  color: $color-text-muted;
+  gap: 4px;
+  font-size: 12px;
+  color: #d4d4d4;
 
-  &--warn { color: $color-warning; }
+  &--warn { color: #eab308; }
 }
 
-// --- Animation ---
+// Tag
+:deep(.el-tag) {
+  border-radius: 4px !important;
+  border: none !important;
+}
+:deep(.el-tag--info) { background: #f5f5f5 !important; color: #525252 !important; }
+:deep(.el-tag--warning) { background: #fefce8 !important; color: #ca8a04 !important; }
+
 @keyframes statusPulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(0.85); }
 }
 
-// --- Responsive ---
-@media (max-width: $breakpoint-md) {
-  .step-indicator { gap: $spacing-md; }
-  .success-section { padding: $spacing-sm 0; }
+@media (max-width: 1024px) {
+  .step-indicator { gap: 14px; }
+  .success-section { padding: 8px 0; }
 }
 
-@media (max-width: $breakpoint-sm) {
-  .publish-status-card { padding: $spacing-md; }
-  .step-indicator { flex-wrap: wrap; gap: $spacing-sm; }
+@media (max-width: 768px) {
+  .publish-status-card { padding: 12px; }
+  .step-indicator { flex-wrap: wrap; gap: 10px; }
 }
 </style>

@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 import { ref, computed, onMounted, markRaw, type Component } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Position, Clock, Download } from '@element-plus/icons-vue'
@@ -26,6 +31,8 @@ const JOB_STATUS_MAP: Record<string, string> = {
   queued: '排队中',
   submitting: '正在提交',
   polling: '等待平台审核',
+  awaiting_extension: '等待插件填充',
+  awaiting_manual: '等待手动复制',
   success: '发布成功',
   failed: '发布失败',
   cancelled: '已取消',
@@ -87,9 +94,22 @@ export function usePublish(getDraft: () => DraftVO | null) {
   })
 
   // --- Computed: Publish ---
+  // Returns the delivery mode of the currently selected WeChat account, or
+  // 'api' as a safe default (matches existing behavior when no account or no
+  // explicit mode is configured).
+  const selectedDeliveryMode = computed(() => {
+    const acc = accounts.value.find(a => a.id === selectedAccountId.value)
+    return acc?.delivery_mode || 'api'
+  })
+
   const isJobInProgress = computed(() => {
     if (!publishJob.value) return false
     return ['queued', 'submitting', 'polling'].includes(publishJob.value.status)
+  })
+
+  const isJobAwaitingUser = computed(() => {
+    if (!publishJob.value) return false
+    return ['awaiting_extension', 'awaiting_manual'].includes(publishJob.value.status)
   })
 
   const canPublish = computed(() => {
@@ -103,11 +123,20 @@ export function usePublish(getDraft: () => DraftVO | null) {
 
   const canCancel = computed(() => {
     if (!publishJob.value) return false
-    return ['queued', 'submitting', 'polling'].includes(publishJob.value.status)
+    return [
+      'queued', 'submitting', 'polling',
+      'awaiting_extension', 'awaiting_manual',
+    ].includes(publishJob.value.status)
   })
 
   const publishButtonLabel = computed(() => {
     if (publishing.value) return '发布中...'
+    if (selectedDeliveryMode.value === 'extension') {
+      return '通过插件发布'
+    }
+    if (selectedDeliveryMode.value === 'manual') {
+      return '准备复制内容'
+    }
     switch (publishMode.value) {
       case 'now': return '立即发布'
       case 'schedule': return '确认定时'
@@ -231,11 +260,17 @@ export function usePublish(getDraft: () => DraftVO | null) {
     const draft = getDraft()
     if (!draft) return
 
-    const modeDesc = publishMode.value === 'now'
-      ? '文章将立即推送至公众号，确认发布？'
-      : publishMode.value === 'schedule'
-        ? `文章将于 ${formatScheduleTime(scheduleTime.value)} 自动推送，确认设置？`
-        : '将导出文章 HTML 内容至剪贴板，确认导出？'
+    const delivery = selectedDeliveryMode.value
+    const modeDesc =
+      delivery === 'extension'
+        ? '将打开微信公众号编辑器,由浏览器插件自动填充标题、正文、封面。继续吗？'
+        : delivery === 'manual'
+          ? '将打开微信公众号编辑器,你需要手动粘贴内容。继续吗？'
+          : publishMode.value === 'now'
+            ? '文章将立即推送至公众号，确认发布？'
+            : publishMode.value === 'schedule'
+              ? `文章将于 ${formatScheduleTime(scheduleTime.value)} 自动推送，确认设置？`
+              : '将导出文章 HTML 内容至剪贴板，确认导出？'
 
     try {
       await ElMessageBox.confirm(modeDesc, '确认发布', {
@@ -255,8 +290,20 @@ export function usePublish(getDraft: () => DraftVO | null) {
       })
       if (resp.code === 0) {
         publishJob.value = resp.data
-        ElMessage.success('发布任务已创建')
-        startPolling()
+        // Extension/manual: open the WeChat editor in a new tab. The plugin
+        // (or the user) takes over from there. We DON'T poll — the job stays
+        // in awaiting_extension until the plugin reports back via /fulfilled.
+        if (resp.data.editor_url && (resp.data.delivery_mode === 'extension' || resp.data.delivery_mode === 'manual')) {
+          window.open(resp.data.editor_url, '_blank', 'noopener,noreferrer')
+          ElMessage.success(
+            resp.data.delivery_mode === 'extension'
+              ? '已打开 WeChat 编辑器,插件将自动填充'
+              : '已打开 WeChat 编辑器,请手动粘贴内容',
+          )
+        } else {
+          ElMessage.success('发布任务已创建')
+          startPolling()
+        }
       }
     } catch {
       ElMessage.error('创建发布任务失败，请重试')
@@ -344,6 +391,8 @@ export function usePublish(getDraft: () => DraftVO | null) {
     publishButtonLabel,
     publishButtonIcon,
     isJobInProgress,
+    isJobAwaitingUser,
+    selectedDeliveryMode,
     // Job status computed
     jobStatusTagType,
     jobStatusLabel,

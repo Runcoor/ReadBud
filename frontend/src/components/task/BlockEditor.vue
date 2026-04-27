@@ -1,3 +1,9 @@
+<!--
+  Copyright (C) 2026 Leazoot
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  This file is part of ReadBud, licensed under the GNU AGPL v3.
+  See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+-->
 <template>
   <div class="block-editor">
     <div
@@ -162,17 +168,18 @@ function handleDelete(block: BlockVO): void {
 .block-editor {
   display: flex;
   flex-direction: column;
-  gap: $spacing-md;
+  gap: 12px;
 }
 
 .block-item {
-  border: 1px solid $color-border;
-  border-radius: $radius-base;
-  background: $color-card-bg;
-  transition: box-shadow $transition-fast;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  background: var(--surface-card);
+  transition: all 0.15s ease;
 
   &.is-editable:hover {
-    box-shadow: $shadow-card-hover;
+    border-color: #0a0a0a;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 
     .block-toolbar {
       opacity: 1;
@@ -183,11 +190,11 @@ function handleDelete(block: BlockVO): void {
 .block-header {
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-md;
-  border-bottom: 1px solid $color-divider;
-  background: $color-bg;
-  border-radius: $radius-base $radius-base 0 0;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f5f5f5;
+  background: #fafafa;
+  border-radius: 8px 8px 0 0;
 }
 
 .block-type-icon {
@@ -196,9 +203,9 @@ function handleDelete(block: BlockVO): void {
 }
 
 .block-heading {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  color: $color-text-primary;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a1a1a;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -207,17 +214,17 @@ function handleDelete(block: BlockVO): void {
 
 .block-toolbar {
   display: flex;
-  gap: $spacing-xs;
+  gap: 4px;
   margin-left: auto;
   opacity: 0;
-  transition: opacity $transition-fast;
+  transition: opacity 0.15s ease;
 }
 
 .block-content {
-  padding: $spacing-md;
-  font-size: $font-size-base;
-  color: $color-text-primary;
-  line-height: $line-height-relaxed;
+  padding: 14px;
+  font-size: 14px;
+  color: #1a1a1a;
+  line-height: 1.6;
 
   p {
     margin: 0;
@@ -225,35 +232,90 @@ function handleDelete(block: BlockVO): void {
 
   .block-asset img {
     max-width: 100%;
-    border-radius: $radius-sm;
+    border-radius: 8px;
   }
 
   .text-muted {
-    color: $color-text-muted;
+    color: #d4d4d4;
     font-style: italic;
   }
 }
 
-// Responsive: Tablet — show toolbar on touch devices
-@media (max-width: $breakpoint-md) {
+// Tag overrides
+:deep(.el-tag) {
+  border-radius: 4px !important;
+  border: none !important;
+}
+:deep(.el-tag--info) { background: #f5f5f5 !important; color: #525252 !important; }
+:deep(.el-tag--success) { background: #f0fdf4 !important; color: #16a34a !important; }
+:deep(.el-tag--warning) { background: #fefce8 !important; color: #ca8a04 !important; }
+:deep(.el-tag--danger) { background: #fef2f2 !important; color: #dc2626 !important; }
+
+// Button overrides
+:deep(.el-button) {
+  color: #525252 !important;
+  &:hover {
+    color: #0a0a0a !important;
+    background: #f5f5f5 !important;
+  }
+}
+
+:deep(.el-button--danger) {
+  color: #ef4444 !important;
+}
+
+// Dialog
+:deep(.el-dialog) {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12) !important;
+  .el-dialog__header { border-bottom: 1px solid #e8e8e8; }
+  .el-dialog__title { color: #0a0a0a !important; font-weight: 600; }
+  .el-dialog__footer { border-top: 1px solid #e8e8e8; }
+}
+
+:deep(.el-textarea__inner) {
+  background: var(--surface-card) !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  color: #0a0a0a !important;
+  &::placeholder { color: #c4c4c4 !important; }
+  &:focus { border-color: #0a0a0a !important; box-shadow: 0 0 0 2px rgba(10, 10, 10, 0.1) !important; }
+}
+
+:deep(.el-button--primary) {
+  background: #0a0a0a !important;
+  border-color: #0a0a0a !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+}
+
+:deep(.el-button--default) {
+  background: var(--surface-card) !important;
+  border: 1px solid #e8e8e8 !important;
+  color: #0a0a0a !important;
+  border-radius: 8px !important;
+  &:hover { border-color: #0a0a0a !important; }
+}
+
+@media (max-width: 1024px) {
   .block-toolbar {
     opacity: 1;
   }
 }
 
-// Responsive: Mobile — stack block header
-@media (max-width: $breakpoint-sm) {
+@media (max-width: 768px) {
   .block-header {
     flex-wrap: wrap;
-    gap: $spacing-xs;
-    padding: $spacing-xs $spacing-sm;
+    gap: 4px;
+    padding: 8px 10px;
   }
 
   .block-heading {
     flex-basis: 100%;
     order: 3;
     white-space: normal;
-    font-size: $font-size-xs;
+    font-size: 12px;
   }
 
   .block-toolbar {
@@ -262,8 +324,8 @@ function handleDelete(block: BlockVO): void {
   }
 
   .block-content {
-    padding: $spacing-sm;
-    font-size: $font-size-sm;
+    padding: 10px;
+    font-size: 13px;
   }
 }
 </style>

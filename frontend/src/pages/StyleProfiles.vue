@@ -1,6 +1,12 @@
+<!--
+  Copyright (C) 2026 Leazoot
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  This file is part of ReadBud, licensed under the GNU AGPL v3.
+  See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+-->
 <template>
   <div class="style-page">
-    <header class="style-header">
+    <header class="mono-header">
       <div class="header-brand">
         <h1 class="header-title">阅芽</h1>
         <span class="header-divider">|</span>
@@ -12,7 +18,7 @@
     </header>
 
     <main class="style-main">
-      <div class="section-card">
+      <div class="mono-card section-card">
         <div class="section-toolbar">
           <div>
             <h3 class="section-title">写作模板管理</h3>
@@ -39,7 +45,7 @@
           v-else
           :data="profiles"
           stripe
-          class="style-table"
+          class="mono-table"
         >
           <el-table-column prop="name" label="模板名称" min-width="140">
             <template #default="{ row }">
@@ -63,7 +69,7 @@
           </el-table-column>
           <el-table-column label="操作" width="140" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" text type="primary" @click="openEditDialog(row)">编辑</el-button>
+              <el-button size="small" text @click="openEditDialog(row)">编辑</el-button>
               <el-button size="small" text type="danger" @click="handleDelete(row)">删除</el-button>
             </template>
           </el-table-column>
@@ -316,146 +322,163 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: $color-bg;
+  background: #fafafa;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
 }
 
-.style-header {
+.mono-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 56px;
-  padding: 0 $spacing-xl;
-  background-color: $color-card-bg;
-  border-bottom: 1px solid $color-border;
-  box-shadow: $shadow-card;
+  height: 60px;
+  padding: 0 32px;
+  background: var(--surface-card);
+  border-bottom: 1px solid #e8e8e8;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-.header-brand {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-}
+.header-brand { display: flex; align-items: center; gap: 12px; }
+.header-title { font-size: 20px; font-weight: 700; color: #0a0a0a; }
+.header-divider { color: #d4d4d4; }
+.header-desc { font-size: 14px; color: #525252; }
 
-.header-title {
-  font-size: $font-size-lg;
-  font-weight: $font-weight-bold;
-  color: $color-primary;
-}
-
-.header-divider {
-  color: $color-border;
-}
-
-.header-desc {
-  font-size: $font-size-base;
-  color: $color-text-secondary;
+.header-actions {
+  :deep(.el-button) {
+    color: #525252 !important;
+    &:hover { color: #0a0a0a !important; background: #f5f5f5 !important; }
+  }
 }
 
 .style-main {
   max-width: 1100px;
   width: 100%;
   margin: 0 auto;
-  padding: $spacing-xl;
+  padding: 32px;
 }
 
-.section-card {
-  background: $color-card-bg;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-  padding: $spacing-xl;
+.mono-card {
+  background: var(--surface-card);
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .section-toolbar {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: $spacing-lg;
+  margin-bottom: 20px;
 }
 
-.section-title {
-  font-size: $font-size-lg;
-  font-weight: $font-weight-semibold;
-  color: $color-text-primary;
-  margin: 0 0 $spacing-xs 0;
-}
+.section-title { font-size: 18px; font-weight: 600; color: #0a0a0a; margin: 0 0 4px 0; }
+.section-desc { font-size: 13px; color: #d4d4d4; margin: 0; }
 
-.section-desc {
-  font-size: $font-size-sm;
-  color: $color-text-muted;
-  margin: 0;
-}
+.section-loading, .section-error { padding: 24px 0; }
+.section-error { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 
-.section-loading,
-.section-error {
-  padding: $spacing-xl 0;
-}
-
-.section-error {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
-  align-items: flex-start;
-}
-
-.style-table {
-  width: 100%;
+// Table
+:deep(.el-table) {
+  --el-table-border-color: #e8e8e8;
+  --el-table-header-bg-color: #fafafa;
+  --el-table-row-hover-bg-color: #f5f5f5;
+  th { font-weight: 600 !important; color: #525252 !important; }
 }
 
 .profile-link {
-  color: $color-accent;
-  font-weight: $font-weight-medium;
+  color: #0a0a0a;
+  font-weight: 500;
   cursor: pointer;
-
-  &:hover {
-    text-decoration: underline;
-  }
+  &:hover { text-decoration: underline; }
 }
 
-.scene-text {
-  color: $color-text-secondary;
-  font-size: $font-size-sm;
-}
+.scene-text { color: #525252; font-size: 13px; }
 
 .template-preview {
-  font-size: $font-size-sm;
-  color: $color-text-muted;
-  line-height: $line-height-normal;
+  font-size: 13px;
+  color: #d4d4d4;
+  line-height: 1.5;
 }
 
-// Responsive
-@media (max-width: $breakpoint-md) {
-  .style-main {
-    padding: $spacing-base;
-    max-width: 100%;
-  }
+// Element Plus overrides
+:deep(.el-button--primary) {
+  background: #0a0a0a !important;
+  border-color: #0a0a0a !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  &:hover { background: #333 !important; border-color: #333 !important; }
+  &:active { transform: scale(0.98); }
+}
 
-  .section-card {
-    padding: $spacing-base;
-  }
+:deep(.el-button--danger) { color: #ef4444 !important; }
 
-  .section-toolbar {
-    flex-direction: column;
-    gap: $spacing-sm;
+:deep(.el-skeleton) { --el-skeleton-color: #f5f5f5; --el-skeleton-to-color: #e8e8e8; }
+:deep(.el-empty__description p) { color: #525252 !important; }
+
+:deep(.el-alert) {
+  border-radius: 8px;
+  &.el-alert--error {
+    background: #fef2f2 !important;
+    border: 1px solid #fecaca !important;
+    .el-alert__title { color: #dc2626 !important; }
   }
 }
 
-@media (max-width: $breakpoint-sm) {
-  .style-header {
-    height: 48px;
-    padding: 0 $spacing-sm;
-  }
+:deep(.el-dialog) {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12) !important;
+  .el-dialog__header { border-bottom: 1px solid #e8e8e8; padding: 20px 24px; }
+  .el-dialog__body { padding: 24px; }
+  .el-dialog__title { font-weight: 600; color: #0a0a0a; }
+  .el-dialog__footer { border-top: 1px solid #e8e8e8; padding: 16px 24px; }
+}
 
-  .header-desc,
-  .header-divider {
-    display: none;
-  }
+:deep(.el-form-item__label) { color: #525252 !important; }
 
-  .style-main {
-    padding: $spacing-sm;
-  }
+:deep(.el-input__wrapper) {
+  background: var(--surface-card) !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  &:hover { border-color: #d4d4d4 !important; }
+  &.is-focus { border-color: #0a0a0a !important; box-shadow: 0 0 0 2px rgba(10, 10, 10, 0.1) !important; }
+}
 
-  .section-card {
-    padding: $spacing-sm;
-  }
+:deep(.el-input__inner) {
+  color: #0a0a0a !important;
+  &::placeholder { color: #c4c4c4 !important; }
+}
+
+:deep(.el-textarea__inner) {
+  background: var(--surface-card) !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  color: #0a0a0a !important;
+  &::placeholder { color: #c4c4c4 !important; }
+  &:focus { border-color: #0a0a0a !important; box-shadow: 0 0 0 2px rgba(10, 10, 10, 0.1) !important; }
+}
+
+:deep(.el-button--default) {
+  background: var(--surface-card) !important;
+  border: 1px solid #e8e8e8 !important;
+  color: #0a0a0a !important;
+  border-radius: 8px !important;
+  &:hover { border-color: #0a0a0a !important; }
+}
+
+@media (max-width: 1024px) {
+  .style-main { padding: 16px; max-width: 100%; }
+  .mono-card { padding: 16px; }
+  .section-toolbar { flex-direction: column; gap: 10px; }
+}
+
+@media (max-width: 768px) {
+  .mono-header { height: 52px; padding: 0 12px; }
+  .header-desc, .header-divider { display: none; }
+  .style-main { padding: 12px; }
+  .mono-card { padding: 12px; }
 }
 </style>

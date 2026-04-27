@@ -1,803 +1,812 @@
+<!--
+  Copyright (C) 2026 Leazoot
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  This file is part of ReadBud, licensed under the GNU AGPL v3.
+  See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+-->
 <template>
   <div class="settings-page">
-    <!-- Header -->
-    <header class="settings-header">
-      <div class="header-brand">
-        <h1 class="header-title">阅芽</h1>
-        <span class="header-divider">|</span>
-        <span class="header-desc">系统设置</span>
-      </div>
-      <div class="header-actions">
-        <button class="back-btn" @click="router.push({ name: 'Workbench' })">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          返回工作台
-        </button>
-      </div>
-    </header>
+    <AppTopBar crumb="系统设置">
+      <template #right>
+        <button class="rail-btn" @click="router.push({ name: 'Workbench' })">← 返回工作台</button>
+      </template>
+    </AppTopBar>
 
-    <!-- Tab switcher -->
-    <div class="tab-bar">
-      <button
-        class="tab-item"
-        :class="{ active: activeTab === 'providers' }"
-        @click="activeTab = 'providers'"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="2" y="3" width="20" height="18" rx="2" />
-          <path d="M8 7h8M8 12h5" />
-        </svg>
-        服务配置
-      </button>
-      <button
-        class="tab-item"
-        :class="{ active: activeTab === 'wechat' }"
-        @click="activeTab = 'wechat'"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-        </svg>
-        公众号管理
-      </button>
-    </div>
+    <div class="settings-shell">
+      <!-- COL 1: Sidebar nav (220px) -->
+      <aside class="nav-rail">
+        <div class="nav-rail__label">SETTINGS</div>
+        <nav class="nav-rail__list">
+          <button
+            v-for="item in navItems"
+            :key="item.key"
+            class="nav-item"
+            :class="{
+              'nav-item--active': !item.disabled && activeTab === item.tab,
+              'nav-item--disabled': item.disabled,
+            }"
+            @click="onNavClick(item)"
+          >
+            <span class="nav-item__indicator" />
+            <span class="nav-item__label">{{ item.label }}</span>
+            <span v-if="item.disabled" class="nav-item__chip">SOON</span>
+          </button>
+        </nav>
+      </aside>
 
-    <!-- Provider Tab — split layout -->
-    <main v-if="activeTab === 'providers'" class="settings-body">
-      <div class="split-layout">
-        <!-- Left: Provider list -->
-        <aside class="provider-sidebar">
-          <div class="sidebar-header">
-            <span class="sidebar-title">服务列表</span>
-            <span v-if="providers.length" class="sidebar-count">{{ providers.length }}</span>
-          </div>
+      <!-- COL 2: List column (320px) -->
+      <aside class="list-col">
+        <!-- Provider list -->
+        <template v-if="activeTab === 'providers'">
+          <header class="list-col__header">
+            <div class="list-col__head-row">
+              <SectionLabel
+                title="服务列表"
+                :hint="providerSubtitle"
+              />
+              <span class="list-col__count">{{ providerCountLabel }}</span>
+            </div>
+          </header>
 
-          <div v-if="providerLoading" class="sidebar-loading">
+          <div v-if="providerLoading" class="list-col__state">
             <span class="mini-spinner"></span>
-            <span>加载中...</span>
+            <span>加载中…</span>
           </div>
 
-          <div v-else-if="providerError" class="sidebar-error">
+          <div v-else-if="providerError" class="list-col__state list-col__state--error">
             <p>{{ providerError }}</p>
-            <button class="text-btn" @click="loadProviders">重试</button>
+            <button class="text-link" @click="loadProviders">重试</button>
           </div>
 
-          <div v-else class="provider-list">
+          <div v-else class="list-col__items">
             <button
               v-for="p in providers"
               :key="p.id"
-              class="provider-item"
-              :class="{ active: selectedProviderId === p.id }"
+              class="row-item"
+              :class="{ 'row-item--active': selectedProviderId === p.id }"
               @click="selectProvider(p)"
             >
-              <div class="provider-icon">
-                {{ getProviderIcon(p.provider_type) }}
+              <div class="row-item__icon">{{ getProviderIcon(p.provider_type) }}</div>
+              <div class="row-item__body">
+                <div class="row-item__title-row">
+                  <span class="row-item__name">{{ p.provider_name }}</span>
+                  <MonoChip v-if="p.is_default" kind="sprout">DEFAULT</MonoChip>
+                </div>
+                <span class="row-item__sub">{{ getProviderLabel(p.provider_type) }}</span>
               </div>
-              <div class="provider-info">
-                <span class="provider-name">{{ p.provider_name }}</span>
-                <span class="provider-type-label">{{ getProviderLabel(p.provider_type) }}</span>
-              </div>
-              <span v-if="p.is_default" class="badge badge-default" title="默认">默认</span>
-              <span
-                class="status-dot"
-                :class="{ online: p.status === 1 }"
-                :title="p.status === 1 ? '启用' : '停用'"
-              ></span>
+              <StatusDot
+                :kind="p.status === 1 ? 'sprout' : 'mute'"
+                :size="6"
+              />
             </button>
 
-            <div v-if="providers.length === 0" class="sidebar-empty">
-              <p>暂无服务配置</p>
-            </div>
+            <p v-if="providers.length === 0" class="list-col__empty-text">暂无服务配置</p>
           </div>
 
-          <button class="add-provider-btn" @click="startAddProvider">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            添加服务
-          </button>
-        </aside>
+          <button class="add-cta" @click="startAddProvider">+ 添加服务</button>
+        </template>
 
-        <!-- Right: Provider detail / form -->
-        <section class="provider-detail">
-          <!-- Empty state -->
-          <div v-if="!editingProvider && !isAddingNew" class="detail-empty">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.25">
-              <rect x="2" y="3" width="20" height="18" rx="2" />
-              <path d="M8 7h8M8 12h5M8 17h3" />
-            </svg>
-            <p>选择左侧服务查看配置</p>
+        <!-- WeChat account list -->
+        <template v-else-if="activeTab === 'wechat'">
+          <header class="list-col__header">
+            <div class="list-col__head-row">
+              <SectionLabel
+                title="公众号列表"
+                :hint="wechatSubtitle"
+              />
+              <span class="list-col__count">{{ wechatCountLabel }}</span>
+            </div>
+          </header>
+
+          <div v-if="wechatLoading" class="list-col__state">
+            <span class="mini-spinner"></span>
+            <span>加载中…</span>
           </div>
 
-          <!-- Add new provider form -->
-          <div v-else-if="isAddingNew" class="detail-form">
-            <div class="detail-header">
-              <h3>添加新服务</h3>
-            </div>
+          <div v-else-if="wechatError" class="list-col__state list-col__state--error">
+            <p>{{ wechatError }}</p>
+            <button class="text-link" @click="loadWechatAccounts">重试</button>
+          </div>
 
-            <div class="form-scroll">
-              <div class="form-group">
-                <label class="form-label">服务类型</label>
-                <div class="select-wrapper">
-                  <select v-model="newProviderType" class="mono-select" @change="onNewTypeChange">
-                    <option value="" disabled>请选择服务类型</option>
-                    <option v-for="(label, key) in PROVIDER_TYPE_LABELS" :key="key" :value="key">
-                      {{ label }}
-                    </option>
-                  </select>
+          <div v-else class="list-col__items">
+            <button
+              v-for="acct in wechatAccounts"
+              :key="acct.id"
+              class="row-item"
+              :class="{ 'row-item--active': selectedWechatId === acct.id }"
+              @click="selectWechatAccount(acct)"
+            >
+              <div class="row-item__icon">WX</div>
+              <div class="row-item__body">
+                <div class="row-item__title-row">
+                  <span class="row-item__name">{{ acct.name }}</span>
+                  <MonoChip v-if="acct.is_default" kind="sprout">DEFAULT</MonoChip>
                 </div>
+                <span class="row-item__sub">{{ getTokenModeLabel(acct.token_mode) }}</span>
               </div>
+              <StatusDot
+                :kind="acct.status === 1 ? 'sprout' : 'mute'"
+                :size="6"
+              />
+            </button>
 
-              <template v-if="newProviderType">
-                <div class="form-group">
-                  <label class="form-label">服务名称</label>
-                  <input v-model="formFields.name" class="mono-input" placeholder="例如：OpenAI GPT-4" />
+            <p v-if="wechatAccounts.length === 0" class="list-col__empty-text">暂无公众号配置</p>
+          </div>
+
+          <button class="add-cta" @click="startAddWechat">+ 添加公众号</button>
+        </template>
+      </aside>
+
+      <!-- COL 3: Detail / edit panel (flex) -->
+      <section class="edit-col">
+        <!-- ============== PROVIDER FLOW ============== -->
+        <template v-if="activeTab === 'providers'">
+          <!-- Empty state -->
+          <div v-if="!editingProvider && !isAddingNew" class="empty-card">
+            <div class="empty-card__code">EMPTY · 选择左侧服务查看配置</div>
+          </div>
+
+          <!-- Add new provider -->
+          <template v-else-if="isAddingNew">
+            <div class="edit-header">
+              <div class="edit-header__title-row">
+                <h2 class="edit-header__title">添加服务</h2>
+              </div>
+              <p class="edit-header__desc">
+                选择服务类型并填入连接信息。完成后可设为默认或测试连接。
+              </p>
+            </div>
+
+            <div class="form-card">
+              <div class="form-grid">
+                <div class="field">
+                  <label class="field__label">服务类型</label>
+                  <el-select v-model="newProviderType" placeholder="请选择服务类型" @change="onNewTypeChange">
+                    <el-option
+                      v-for="(label, key) in PROVIDER_TYPE_LABELS"
+                      :key="key"
+                      :value="key"
+                      :label="label"
+                    />
+                  </el-select>
                 </div>
 
-                <!-- LLM fields -->
-                <template v-if="newProviderType === 'llm'">
-                  <div class="form-group">
-                    <label class="form-label">API 格式</label>
-                    <div class="select-wrapper">
-                      <select v-model="formFields.api_format" class="mono-select">
-                        <option value="openai">OpenAI 兼容</option>
-                        <option value="anthropic">Anthropic</option>
-                      </select>
+                <template v-if="newProviderType">
+                  <div class="field">
+                    <label class="field__label">服务名称</label>
+                    <el-input v-model="formFields.name" placeholder="例如：OpenAI GPT-4" />
+                  </div>
+
+                  <!-- LLM -->
+                  <template v-if="newProviderType === 'llm'">
+                    <div class="field">
+                      <label class="field__label">API 格式</label>
+                      <el-select v-model="formFields.api_format">
+                        <el-option value="openai" label="OpenAI 兼容" />
+                        <el-option value="anthropic" label="Anthropic" />
+                      </el-select>
                     </div>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">API 地址</label>
-                    <input v-model="formFields.base_url" class="mono-input" placeholder="https://api.openai.com/v1" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">模型名称</label>
-                    <input v-model="formFields.model" class="mono-input" placeholder="gpt-4 / claude-3-opus / deepseek-chat" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">API Key</label>
-                    <div class="input-with-toggle">
-                      <input
+                    <div class="field">
+                      <label class="field__label">API 地址</label>
+                      <el-input v-model="formFields.base_url" placeholder="https://api.openai.com/v1" />
+                    </div>
+                    <div class="field">
+                      <label class="field__label">模型名称</label>
+                      <el-input v-model="formFields.model" placeholder="gpt-4 / claude-3-opus / deepseek-chat" />
+                    </div>
+                    <div class="field">
+                      <label class="field__label">API Key</label>
+                      <el-input
                         v-model="formFields.api_key"
                         :type="showApiKey ? 'text' : 'password'"
-                        class="mono-input mono-key"
                         placeholder="sk-..."
-                      />
-                      <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                        <svg v-if="!showApiKey" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                        </svg>
-                        <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                          <line x1="1" y1="1" x2="23" y2="23" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="form-row">
-                    <div class="form-group flex-1">
-                      <label class="form-label">温度 <span class="label-value">{{ formFields.temperature }}</span></label>
-                      <input
-                        v-model.number="formFields.temperature"
-                        type="range"
-                        min="0"
-                        max="2"
-                        step="0.1"
-                        class="mono-slider"
+                        class="field__mono"
+                        show-password
                       />
                     </div>
-                    <div class="form-group flex-1">
-                      <label class="form-label">最大 Token 数</label>
-                      <input v-model.number="formFields.max_tokens" type="number" class="mono-input" placeholder="4096" />
+                    <div class="field-row">
+                      <div class="field">
+                        <label class="field__label">温度 <span class="field__hint">{{ formFields.temperature }}</span></label>
+                        <el-slider v-model="formFields.temperature" :min="0" :max="2" :step="0.1" />
+                      </div>
+                      <div class="field">
+                        <label class="field__label">最大 Token 数</label>
+                        <el-input-number v-model="formFields.max_tokens" :min="0" :controls="false" placeholder="4096" />
+                      </div>
                     </div>
-                  </div>
-                </template>
+                  </template>
 
-                <!-- Image Gen fields -->
-                <template v-else-if="newProviderType === 'image_gen'">
-                  <div class="form-group">
-                    <label class="form-label">API 格式</label>
-                    <div class="select-wrapper">
-                      <select v-model="formFields.api_format" class="mono-select">
-                        <option value="openai">OpenAI 兼容</option>
-                        <option value="vertex_imagen">Vertex AI Imagen</option>
-                      </select>
+                  <!-- Image Gen -->
+                  <template v-else-if="newProviderType === 'image_gen'">
+                    <div class="field">
+                      <label class="field__label">API 格式</label>
+                      <el-select v-model="formFields.api_format">
+                        <el-option value="openai" label="OpenAI 兼容" />
+                        <el-option value="vertex_imagen" label="Vertex AI Imagen" />
+                      </el-select>
                     </div>
-                  </div>
-                  <template v-if="formFields.api_format === 'openai'">
-                    <div class="form-group">
-                      <label class="form-label">API 地址</label>
-                      <input v-model="formFields.base_url" class="mono-input" placeholder="https://api.openai.com/v1" />
+                    <template v-if="formFields.api_format === 'openai'">
+                      <div class="field">
+                        <label class="field__label">API 地址</label>
+                        <el-input v-model="formFields.base_url" placeholder="https://api.openai.com/v1" />
+                      </div>
+                      <div class="field">
+                        <label class="field__label">模型名称</label>
+                        <el-input v-model="formFields.model" placeholder="dall-e-3" />
+                      </div>
+                    </template>
+                    <template v-else-if="formFields.api_format === 'vertex_imagen'">
+                      <div class="field">
+                        <label class="field__label">项目 ID</label>
+                        <el-input v-model="formFields.project_id" placeholder="my-gcp-project" />
+                      </div>
+                      <div class="field">
+                        <label class="field__label">区域</label>
+                        <el-input v-model="formFields.region" placeholder="us-central1" />
+                      </div>
+                      <div class="field">
+                        <label class="field__label">模型名称</label>
+                        <el-input v-model="formFields.model" placeholder="imagegeneration@006" />
+                      </div>
+                    </template>
+                    <div class="field">
+                      <label class="field__label">API Key / 凭证</label>
+                      <el-input
+                        v-model="formFields.api_key"
+                        :type="showApiKey ? 'text' : 'password'"
+                        placeholder="API Key 或凭证 JSON"
+                        class="field__mono"
+                        show-password
+                      />
                     </div>
-                    <div class="form-group">
-                      <label class="form-label">模型名称</label>
-                      <input v-model="formFields.model" class="mono-input" placeholder="dall-e-3" />
+                    <div class="field-row">
+                      <div class="field">
+                        <label class="field__label">图片宽度</label>
+                        <el-input-number v-model="formFields.image_width" :min="0" :controls="false" placeholder="1024" />
+                      </div>
+                      <div class="field">
+                        <label class="field__label">图片高度</label>
+                        <el-input-number v-model="formFields.image_height" :min="0" :controls="false" placeholder="1024" />
+                      </div>
                     </div>
-                    <div class="form-group">
-                      <label class="form-label">API Key</label>
-                      <div class="input-with-toggle">
-                        <input
+                  </template>
+
+                  <!-- Search -->
+                  <template v-else-if="newProviderType === 'search'">
+                    <div class="field">
+                      <label class="field__label">搜索服务商</label>
+                      <el-select v-model="formFields.search_provider">
+                        <el-option value="google_custom" label="Google Custom Search" />
+                        <el-option value="tavily" label="Tavily Search" />
+                        <el-option value="serpapi" label="SerpAPI" />
+                        <el-option value="bing" label="Bing Search" />
+                      </el-select>
+                    </div>
+                    <template v-if="formFields.search_provider === 'google_custom'">
+                      <div class="field">
+                        <label class="field__label">搜索引擎 ID</label>
+                        <el-input v-model="formFields.search_engine_id" placeholder="Google CSE 的搜索引擎 ID" />
+                        <p class="field__hint-line">在 https://programmablesearchengine.google.com 创建获取</p>
+                      </div>
+                      <div class="field">
+                        <label class="field__label">API Key</label>
+                        <el-input
                           v-model="formFields.api_key"
                           :type="showApiKey ? 'text' : 'password'"
-                          class="mono-input mono-key"
-                          placeholder="sk-..."
+                          placeholder="Google API Key"
+                          class="field__mono"
+                          show-password
                         />
-                        <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                          </svg>
-                        </button>
+                        <p class="field__hint-line">在 Google Cloud Console → APIs & Services → Credentials 获取</p>
                       </div>
-                    </div>
-                  </template>
-                  <template v-else-if="formFields.api_format === 'vertex_imagen'">
-                    <div class="form-group">
-                      <label class="form-label">项目 ID</label>
-                      <input v-model="formFields.project_id" class="mono-input" placeholder="my-gcp-project" />
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">区域</label>
-                      <input v-model="formFields.region" class="mono-input" placeholder="us-central1" />
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">模型名称</label>
-                      <input v-model="formFields.model" class="mono-input" placeholder="imagegeneration@006" />
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">API Key / 凭证</label>
-                      <div class="input-with-toggle">
-                        <input
+                    </template>
+                    <template v-else>
+                      <div class="field">
+                        <label class="field__label">API Key</label>
+                        <el-input
                           v-model="formFields.api_key"
                           :type="showApiKey ? 'text' : 'password'"
-                          class="mono-input mono-key"
-                          placeholder="凭证 JSON 或 API Key"
+                          :placeholder="searchKeyPlaceholder"
+                          class="field__mono"
+                          show-password
                         />
-                        <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                          </svg>
-                        </button>
+                        <p class="field__hint-line">{{ searchKeyHint }}</p>
                       </div>
-                    </div>
+                    </template>
                   </template>
-                  <div class="form-row">
-                    <div class="form-group flex-1">
-                      <label class="form-label">图片宽度</label>
-                      <input v-model.number="formFields.image_width" type="number" class="mono-input" placeholder="1024" />
-                    </div>
-                    <div class="form-group flex-1">
-                      <label class="form-label">图片高度</label>
-                      <input v-model.number="formFields.image_height" type="number" class="mono-input" placeholder="1024" />
-                    </div>
-                  </div>
-                </template>
 
-                <!-- Search fields -->
-                <template v-else-if="newProviderType === 'search'">
-                  <div class="form-group">
-                    <label class="form-label">搜索服务商</label>
-                    <div class="select-wrapper">
-                      <select v-model="formFields.search_provider" class="mono-select">
-                        <option value="google_custom">Google Custom Search</option>
-                        <option value="tavily">Tavily Search</option>
-                        <option value="serpapi">SerpAPI</option>
-                        <option value="bing">Bing Search</option>
-                      </select>
+                  <!-- Image search -->
+                  <template v-else-if="newProviderType === 'image_search'">
+                    <div class="field">
+                      <label class="field__label">图片搜索服务</label>
+                      <el-select v-model="formFields.image_search_provider">
+                        <el-option value="unsplash" label="Unsplash（免费）" />
+                        <el-option value="pexels" label="Pexels（免费）" />
+                        <el-option value="bing" label="Bing Image Search" />
+                      </el-select>
                     </div>
-                  </div>
-                  <template v-if="formFields.search_provider === 'google_custom'">
-                    <div class="form-group">
-                      <label class="form-label">搜索引擎 ID</label>
-                      <input v-model="formFields.search_engine_id" class="mono-input" placeholder="Google CSE 的搜索引擎 ID" />
-                      <span class="form-hint">在 https://programmablesearchengine.google.com 创建获取</span>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">API Key</label>
-                      <div class="input-with-toggle">
-                        <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" placeholder="Google API Key" />
-                        <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                        </button>
-                      </div>
-                      <span class="form-hint">在 Google Cloud Console → APIs & Services → Credentials 获取</span>
+                    <div class="field">
+                      <label class="field__label">API Key</label>
+                      <el-input
+                        v-model="formFields.api_key"
+                        :type="showApiKey ? 'text' : 'password'"
+                        :placeholder="formFields.image_search_provider === 'unsplash' ? 'Access Key' : 'API Key'"
+                        class="field__mono"
+                        show-password
+                      />
+                      <p class="field__hint-line">{{ imageSearchHint }}</p>
                     </div>
                   </template>
-                  <template v-else-if="formFields.search_provider === 'tavily'">
-                    <div class="form-group">
-                      <label class="form-label">API Key</label>
-                      <div class="input-with-toggle">
-                        <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" placeholder="tvly-xxxx" />
-                        <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                        </button>
-                      </div>
-                      <span class="form-hint">在 https://app.tavily.com 注册获取，免费 1000 次/月</span>
+
+                  <!-- Crawler -->
+                  <template v-else-if="newProviderType === 'crawler'">
+                    <div class="field">
+                      <label class="field__label">抓取服务</label>
+                      <el-select v-model="formFields.crawler_provider">
+                        <el-option value="jina" label="Jina Reader（推荐，简单好用）" />
+                        <el-option value="firecrawl" label="Firecrawl" />
+                        <el-option value="custom" label="自定义接口" />
+                      </el-select>
                     </div>
-                  </template>
-                  <template v-else-if="formFields.search_provider === 'serpapi'">
-                    <div class="form-group">
-                      <label class="form-label">API Key</label>
-                      <div class="input-with-toggle">
-                        <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" placeholder="SerpAPI Key" />
-                        <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                        </button>
+                    <template v-if="formFields.crawler_provider === 'custom'">
+                      <div class="field">
+                        <label class="field__label">API 地址</label>
+                        <el-input v-model="formFields.base_url" placeholder="https://your-crawler-api.com" />
                       </div>
-                      <span class="form-hint">在 https://serpapi.com/dashboard 获取，免费 100 次/月</span>
+                    </template>
+                    <div class="field">
+                      <label class="field__label">{{ formFields.crawler_provider === 'custom' ? 'API Key（可选）' : 'API Key' }}</label>
+                      <el-input
+                        v-model="formFields.api_key"
+                        :type="showApiKey ? 'text' : 'password'"
+                        :placeholder="crawlerKeyPlaceholder"
+                        class="field__mono"
+                        show-password
+                      />
+                      <p v-if="crawlerKeyHint" class="field__hint-line">{{ crawlerKeyHint }}</p>
                     </div>
-                  </template>
-                  <template v-else-if="formFields.search_provider === 'bing'">
-                    <div class="form-group">
-                      <label class="form-label">API Key</label>
-                      <div class="input-with-toggle">
-                        <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" placeholder="Bing Search API Key" />
-                        <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                        </button>
-                      </div>
-                      <span class="form-hint">在 Azure Portal → Cognitive Services → Bing Search 获取</span>
+                    <div class="field">
+                      <label class="field__label">超时时间（秒）</label>
+                      <el-input-number v-model="formFields.crawler_timeout" :min="0" :controls="false" placeholder="30" />
                     </div>
                   </template>
                 </template>
-
-                <!-- Image search fields -->
-                <template v-else-if="newProviderType === 'image_search'">
-                  <div class="form-group">
-                    <label class="form-label">图片搜索服务</label>
-                    <div class="select-wrapper">
-                      <select v-model="formFields.image_search_provider" class="mono-select">
-                        <option value="unsplash">Unsplash（免费）</option>
-                        <option value="pexels">Pexels（免费）</option>
-                        <option value="bing">Bing Image Search</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">API Key</label>
-                    <div class="input-with-toggle">
-                      <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" :placeholder="formFields.image_search_provider === 'unsplash' ? 'Access Key' : 'API Key'" />
-                      <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                      </button>
-                    </div>
-                    <span v-if="formFields.image_search_provider === 'unsplash'" class="form-hint">在 https://unsplash.com/developers 注册应用获取</span>
-                    <span v-else-if="formFields.image_search_provider === 'pexels'" class="form-hint">在 https://www.pexels.com/api/ 注册获取</span>
-                    <span v-else class="form-hint">在 Azure Portal → Bing Image Search 获取</span>
-                  </div>
-                </template>
-
-                <!-- Crawler fields -->
-                <template v-else-if="newProviderType === 'crawler'">
-                  <div class="form-group">
-                    <label class="form-label">抓取服务</label>
-                    <div class="select-wrapper">
-                      <select v-model="formFields.crawler_provider" class="mono-select">
-                        <option value="jina">Jina Reader（推荐，简单好用）</option>
-                        <option value="firecrawl">Firecrawl</option>
-                        <option value="custom">自定义接口</option>
-                      </select>
-                    </div>
-                  </div>
-                  <template v-if="formFields.crawler_provider === 'jina'">
-                    <div class="form-group">
-                      <label class="form-label">API Key</label>
-                      <div class="input-with-toggle">
-                        <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" placeholder="jina_xxxx" />
-                        <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                        </button>
-                      </div>
-                      <span class="form-hint">在 https://jina.ai/reader 获取，有免费额度</span>
-                    </div>
-                  </template>
-                  <template v-else-if="formFields.crawler_provider === 'firecrawl'">
-                    <div class="form-group">
-                      <label class="form-label">API Key</label>
-                      <div class="input-with-toggle">
-                        <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" placeholder="fc-xxxx" />
-                        <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                        </button>
-                      </div>
-                      <span class="form-hint">在 https://firecrawl.dev 注册获取</span>
-                    </div>
-                  </template>
-                  <template v-else>
-                    <div class="form-group">
-                      <label class="form-label">API 地址</label>
-                      <input v-model="formFields.base_url" class="mono-input" placeholder="https://your-crawler-api.com" />
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">API Key（可选）</label>
-                      <div class="input-with-toggle">
-                        <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" placeholder="留空则不传认证" />
-                        <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                        </button>
-                      </div>
-                    </div>
-                  </template>
-                  <div class="form-group">
-                    <label class="form-label">超时时间（秒）</label>
-                    <input v-model.number="formFields.crawler_timeout" type="number" class="mono-input" placeholder="30" />
-                  </div>
-                </template>
-              </template>
-            </div>
-
-            <div class="detail-actions">
-              <button class="btn-secondary" @click="cancelAdd">取消</button>
-              <button class="btn-primary" :disabled="providerSaving" @click="handleCreateProvider">
-                <span v-if="providerSaving" class="mini-spinner"></span>
-                保存
-              </button>
-            </div>
-          </div>
-
-          <!-- Edit existing provider form -->
-          <div v-else-if="editingProvider" class="detail-form">
-            <div class="detail-header">
-              <h3>{{ editingProvider.provider_name }}</h3>
-              <span class="type-badge">
-                {{ getProviderLabel(editingProvider.provider_type) }}
-              </span>
-            </div>
-
-            <div class="form-scroll">
-              <div class="form-group">
-                <label class="form-label">服务名称</label>
-                <input v-model="formFields.name" class="mono-input" />
               </div>
-
-              <!-- LLM fields -->
-              <template v-if="editingProvider.provider_type === 'llm'">
-                <div class="form-group">
-                  <label class="form-label">API 格式</label>
-                  <div class="select-wrapper">
-                    <select v-model="formFields.api_format" class="mono-select">
-                      <option value="openai">OpenAI 兼容</option>
-                      <option value="anthropic">Anthropic</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">API 地址</label>
-                  <input v-model="formFields.base_url" class="mono-input" placeholder="https://api.openai.com/v1" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">模型名称</label>
-                  <input v-model="formFields.model" class="mono-input" placeholder="gpt-4" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">API Key</label>
-                  <div class="input-with-toggle">
-                    <input
-                      v-model="formFields.api_key"
-                      :type="showApiKey ? 'text' : 'password'"
-                      class="mono-input mono-key"
-                      :placeholder="editingProvider.has_secret ? '已配置（留空保持不变）' : 'sk-...'"
-                    />
-                    <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                <div class="form-row">
-                  <div class="form-group flex-1">
-                    <label class="form-label">温度 <span class="label-value">{{ formFields.temperature }}</span></label>
-                    <input v-model.number="formFields.temperature" type="range" min="0" max="2" step="0.1" class="mono-slider" />
-                  </div>
-                  <div class="form-group flex-1">
-                    <label class="form-label">最大 Token 数</label>
-                    <input v-model.number="formFields.max_tokens" type="number" class="mono-input" placeholder="4096" />
-                  </div>
-                </div>
-              </template>
-
-              <!-- Image Gen fields -->
-              <template v-else-if="editingProvider.provider_type === 'image_gen'">
-                <div class="form-group">
-                  <label class="form-label">API 格式</label>
-                  <div class="select-wrapper">
-                    <select v-model="formFields.api_format" class="mono-select">
-                      <option value="openai">OpenAI 兼容</option>
-                      <option value="vertex_imagen">Vertex AI Imagen</option>
-                    </select>
-                  </div>
-                </div>
-                <template v-if="formFields.api_format === 'openai'">
-                  <div class="form-group">
-                    <label class="form-label">API 地址</label>
-                    <input v-model="formFields.base_url" class="mono-input" placeholder="https://api.openai.com/v1" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">模型名称</label>
-                    <input v-model="formFields.model" class="mono-input" placeholder="dall-e-3" />
-                  </div>
-                </template>
-                <template v-else-if="formFields.api_format === 'vertex_imagen'">
-                  <div class="form-group">
-                    <label class="form-label">项目 ID</label>
-                    <input v-model="formFields.project_id" class="mono-input" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">区域</label>
-                    <input v-model="formFields.region" class="mono-input" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">模型名称</label>
-                    <input v-model="formFields.model" class="mono-input" />
-                  </div>
-                </template>
-                <div class="form-group">
-                  <label class="form-label">API Key</label>
-                  <div class="input-with-toggle">
-                    <input
-                      v-model="formFields.api_key"
-                      :type="showApiKey ? 'text' : 'password'"
-                      class="mono-input mono-key"
-                      :placeholder="editingProvider.has_secret ? '已配置（留空保持不变）' : 'API Key'"
-                    />
-                    <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                <div class="form-row">
-                  <div class="form-group flex-1">
-                    <label class="form-label">图片宽度</label>
-                    <input v-model.number="formFields.image_width" type="number" class="mono-input" placeholder="1024" />
-                  </div>
-                  <div class="form-group flex-1">
-                    <label class="form-label">图片高度</label>
-                    <input v-model.number="formFields.image_height" type="number" class="mono-input" placeholder="1024" />
-                  </div>
-                </div>
-              </template>
-
-              <!-- Search fields (edit) -->
-              <template v-else-if="editingProvider.provider_type === 'search'">
-                <div class="form-group">
-                  <label class="form-label">搜索服务商</label>
-                  <div class="select-wrapper">
-                    <select v-model="formFields.search_provider" class="mono-select">
-                      <option value="google_custom">Google Custom Search</option>
-                      <option value="serpapi">SerpAPI</option>
-                      <option value="bing">Bing Search</option>
-                    </select>
-                  </div>
-                </div>
-                <template v-if="formFields.search_provider === 'google_custom'">
-                  <div class="form-group">
-                    <label class="form-label">搜索引擎 ID</label>
-                    <input v-model="formFields.search_engine_id" class="mono-input" placeholder="Google CSE 搜索引擎 ID" />
-                    <span class="form-hint">在 https://programmablesearchengine.google.com 创建获取</span>
-                  </div>
-                </template>
-                <div class="form-group">
-                  <label class="form-label">API Key</label>
-                  <div class="input-with-toggle">
-                    <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" :placeholder="editingProvider.has_secret ? '已配置（留空保持不变）' : 'API Key'" />
-                    <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                    </button>
-                  </div>
-                </div>
-              </template>
-
-              <!-- Image search fields (edit) -->
-              <template v-else-if="editingProvider.provider_type === 'image_search'">
-                <div class="form-group">
-                  <label class="form-label">图片搜索服务</label>
-                  <div class="select-wrapper">
-                    <select v-model="formFields.image_search_provider" class="mono-select">
-                      <option value="unsplash">Unsplash（免费）</option>
-                      <option value="pexels">Pexels（免费）</option>
-                      <option value="bing">Bing Image Search</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">API Key</label>
-                  <div class="input-with-toggle">
-                    <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" :placeholder="editingProvider.has_secret ? '已配置（留空保持不变）' : 'Access Key'" />
-                    <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                    </button>
-                  </div>
-                </div>
-              </template>
-
-              <!-- Crawler fields (edit) -->
-              <template v-else-if="editingProvider.provider_type === 'crawler'">
-                <div class="form-group">
-                  <label class="form-label">抓取服务</label>
-                  <div class="select-wrapper">
-                    <select v-model="formFields.crawler_provider" class="mono-select">
-                      <option value="jina">Jina Reader</option>
-                      <option value="firecrawl">Firecrawl</option>
-                      <option value="custom">自定义接口</option>
-                    </select>
-                  </div>
-                </div>
-                <template v-if="formFields.crawler_provider === 'custom'">
-                  <div class="form-group">
-                    <label class="form-label">API 地址</label>
-                    <input v-model="formFields.base_url" class="mono-input" placeholder="https://..." />
-                  </div>
-                </template>
-                <div class="form-group">
-                  <label class="form-label">API Key</label>
-                  <div class="input-with-toggle">
-                    <input v-model="formFields.api_key" :type="showApiKey ? 'text' : 'password'" class="mono-input mono-key" :placeholder="editingProvider.has_secret ? '已配置（留空保持不变）' : 'API Key'" />
-                    <button type="button" class="toggle-btn" @click="showApiKey = !showApiKey">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                    </button>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">超时时间（秒）</label>
-                  <input v-model.number="formFields.crawler_timeout" type="number" class="mono-input" placeholder="30" />
-                </div>
-              </template>
             </div>
 
-            <div class="detail-actions">
-              <button class="btn-danger" @click="handleDeleteProvider">删除</button>
-              <div class="actions-right">
-                <button
-                  v-if="editingProvider && !editingProvider.is_default"
-                  class="btn-secondary"
-                  :disabled="settingDefault"
-                  @click="handleSetDefault"
-                >
-                  <span v-if="settingDefault" class="mini-spinner"></span>
-                  设为默认
-                </button>
-                <button class="btn-secondary" :disabled="testingConnection" @click="handleTestConnection">
-                  <span v-if="testingConnection" class="mini-spinner"></span>
-                  测试连接
-                </button>
-                <button class="btn-primary" :disabled="providerSaving" @click="handleUpdateProvider">
-                  <span v-if="providerSaving" class="mini-spinner"></span>
+            <div class="action-bar">
+              <button class="btn-ghost" @click="cancelAdd">取消</button>
+              <div class="action-bar__right">
+                <button class="btn-primary" :disabled="providerSaving" @click="handleCreateProvider">
+                  <span v-if="providerSaving" class="mini-spinner mini-spinner--inverse"></span>
                   保存
                 </button>
               </div>
             </div>
-          </div>
-        </section>
-      </div>
-    </main>
+          </template>
 
-    <!-- WeChat Tab -->
-    <main v-else-if="activeTab === 'wechat'" class="settings-body">
-      <div class="wechat-panel">
-        <div class="panel-header">
-          <h3 class="panel-title">公众号账号管理</h3>
-          <button class="btn-primary small" @click="showWechatDialog = true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            添加账号
-          </button>
-        </div>
+          <!-- Edit existing provider -->
+          <template v-else-if="editingProvider">
+            <div class="edit-header">
+              <div class="edit-header__title-row">
+                <h2 class="edit-header__title">{{ editingProvider.provider_name }}</h2>
+                <MonoChip>{{ getProviderLabel(editingProvider.provider_type) }}</MonoChip>
+                <div class="edit-header__spacer" />
+                <div class="edit-header__status">
+                  <StatusDot :kind="editingProvider.status === 1 ? 'sprout' : 'mute'" :size="6" />
+                  <span>{{ editingProvider.status === 1 ? '已连通' : '未启用' }}</span>
+                </div>
+              </div>
+              <p class="edit-header__desc">
+                配置 {{ getProviderLabel(editingProvider.provider_type) }} 服务的连接信息。可作为默认服务被流水线优先调用。
+              </p>
+            </div>
 
-        <div v-if="wechatLoading" class="panel-loading">
-          <span class="mini-spinner"></span>
-          加载中...
-        </div>
+            <div class="form-card">
+              <div class="form-grid">
+                <div class="field">
+                  <label class="field__label">服务名称</label>
+                  <el-input v-model="formFields.name" />
+                </div>
 
-        <div v-else-if="wechatError" class="panel-error">
-          <p>{{ wechatError }}</p>
-          <button class="text-btn" @click="loadWechatAccounts">重试</button>
-        </div>
+                <!-- LLM -->
+                <template v-if="editingProvider.provider_type === 'llm'">
+                  <div class="field">
+                    <label class="field__label">API 格式</label>
+                    <el-select v-model="formFields.api_format">
+                      <el-option value="openai" label="OpenAI 兼容" />
+                      <el-option value="anthropic" label="Anthropic" />
+                    </el-select>
+                  </div>
+                  <div class="field">
+                    <label class="field__label">API 地址</label>
+                    <el-input v-model="formFields.base_url" placeholder="https://api.openai.com/v1" />
+                  </div>
+                  <div class="field">
+                    <label class="field__label">模型名称</label>
+                    <el-input v-model="formFields.model" placeholder="gpt-4" />
+                  </div>
+                  <div class="field">
+                    <label class="field__label">API Key</label>
+                    <el-input
+                      v-model="formFields.api_key"
+                      :type="showApiKey ? 'text' : 'password'"
+                      :placeholder="editingProvider.has_secret ? '•••••• 已配置（留空保持不变）' : 'sk-...'"
+                      class="field__mono"
+                      show-password
+                    />
+                  </div>
+                  <div class="field-row">
+                    <div class="field">
+                      <label class="field__label">温度 <span class="field__hint">{{ formFields.temperature }}</span></label>
+                      <el-slider v-model="formFields.temperature" :min="0" :max="2" :step="0.1" />
+                    </div>
+                    <div class="field">
+                      <label class="field__label">最大 Token 数</label>
+                      <el-input-number v-model="formFields.max_tokens" :min="0" :controls="false" placeholder="4096" />
+                    </div>
+                  </div>
+                </template>
 
-        <div v-else-if="wechatAccounts.length === 0" class="panel-empty">
-          <p>暂无公众号配置</p>
-        </div>
+                <!-- Image Gen -->
+                <template v-else-if="editingProvider.provider_type === 'image_gen'">
+                  <div class="field">
+                    <label class="field__label">API 格式</label>
+                    <el-select v-model="formFields.api_format">
+                      <el-option value="openai" label="OpenAI 兼容" />
+                      <el-option value="vertex_imagen" label="Vertex AI Imagen" />
+                    </el-select>
+                  </div>
+                  <template v-if="formFields.api_format === 'openai'">
+                    <div class="field">
+                      <label class="field__label">API 地址</label>
+                      <el-input v-model="formFields.base_url" placeholder="https://api.openai.com/v1" />
+                    </div>
+                    <div class="field">
+                      <label class="field__label">模型名称</label>
+                      <el-input v-model="formFields.model" placeholder="dall-e-3" />
+                    </div>
+                  </template>
+                  <template v-else-if="formFields.api_format === 'vertex_imagen'">
+                    <div class="field">
+                      <label class="field__label">项目 ID</label>
+                      <el-input v-model="formFields.project_id" />
+                    </div>
+                    <div class="field">
+                      <label class="field__label">区域</label>
+                      <el-input v-model="formFields.region" />
+                    </div>
+                    <div class="field">
+                      <label class="field__label">模型名称</label>
+                      <el-input v-model="formFields.model" />
+                    </div>
+                  </template>
+                  <div class="field">
+                    <label class="field__label">API Key</label>
+                    <el-input
+                      v-model="formFields.api_key"
+                      :type="showApiKey ? 'text' : 'password'"
+                      :placeholder="editingProvider.has_secret ? '•••••• 已配置（留空保持不变）' : 'API Key'"
+                      class="field__mono"
+                      show-password
+                    />
+                  </div>
+                  <div class="field-row">
+                    <div class="field">
+                      <label class="field__label">图片宽度</label>
+                      <el-input-number v-model="formFields.image_width" :min="0" :controls="false" placeholder="1024" />
+                    </div>
+                    <div class="field">
+                      <label class="field__label">图片高度</label>
+                      <el-input-number v-model="formFields.image_height" :min="0" :controls="false" placeholder="1024" />
+                    </div>
+                  </div>
+                </template>
 
-        <div v-else class="wechat-grid">
-          <div v-for="acct in wechatAccounts" :key="acct.id" class="wechat-card">
-            <div class="wechat-card-header">
-              <span class="wechat-name">{{ acct.name }}</span>
-              <div class="wechat-badges">
-                <span v-if="acct.is_default" class="badge badge-warning">默认</span>
-                <span class="badge" :class="acct.status === 1 ? 'badge-success' : 'badge-muted'">
-                  {{ acct.status === 1 ? '启用' : '停用' }}
-                </span>
+                <!-- Search -->
+                <template v-else-if="editingProvider.provider_type === 'search'">
+                  <div class="field">
+                    <label class="field__label">搜索服务商</label>
+                    <el-select v-model="formFields.search_provider">
+                      <el-option value="google_custom" label="Google Custom Search" />
+                      <el-option value="serpapi" label="SerpAPI" />
+                      <el-option value="bing" label="Bing Search" />
+                    </el-select>
+                  </div>
+                  <template v-if="formFields.search_provider === 'google_custom'">
+                    <div class="field">
+                      <label class="field__label">搜索引擎 ID</label>
+                      <el-input v-model="formFields.search_engine_id" placeholder="Google CSE 搜索引擎 ID" />
+                      <p class="field__hint-line">在 https://programmablesearchengine.google.com 创建获取</p>
+                    </div>
+                  </template>
+                  <div class="field">
+                    <label class="field__label">API Key</label>
+                    <el-input
+                      v-model="formFields.api_key"
+                      :type="showApiKey ? 'text' : 'password'"
+                      :placeholder="editingProvider.has_secret ? '•••••• 已配置（留空保持不变）' : 'API Key'"
+                      class="field__mono"
+                      show-password
+                    />
+                  </div>
+                </template>
+
+                <!-- Image search -->
+                <template v-else-if="editingProvider.provider_type === 'image_search'">
+                  <div class="field">
+                    <label class="field__label">图片搜索服务</label>
+                    <el-select v-model="formFields.image_search_provider">
+                      <el-option value="unsplash" label="Unsplash（免费）" />
+                      <el-option value="pexels" label="Pexels（免费）" />
+                      <el-option value="bing" label="Bing Image Search" />
+                    </el-select>
+                  </div>
+                  <div class="field">
+                    <label class="field__label">API Key</label>
+                    <el-input
+                      v-model="formFields.api_key"
+                      :type="showApiKey ? 'text' : 'password'"
+                      :placeholder="editingProvider.has_secret ? '•••••• 已配置（留空保持不变）' : 'Access Key'"
+                      class="field__mono"
+                      show-password
+                    />
+                  </div>
+                </template>
+
+                <!-- Crawler -->
+                <template v-else-if="editingProvider.provider_type === 'crawler'">
+                  <div class="field">
+                    <label class="field__label">抓取服务</label>
+                    <el-select v-model="formFields.crawler_provider">
+                      <el-option value="jina" label="Jina Reader" />
+                      <el-option value="firecrawl" label="Firecrawl" />
+                      <el-option value="custom" label="自定义接口" />
+                    </el-select>
+                  </div>
+                  <template v-if="formFields.crawler_provider === 'custom'">
+                    <div class="field">
+                      <label class="field__label">API 地址</label>
+                      <el-input v-model="formFields.base_url" placeholder="https://..." />
+                    </div>
+                  </template>
+                  <div class="field">
+                    <label class="field__label">API Key</label>
+                    <el-input
+                      v-model="formFields.api_key"
+                      :type="showApiKey ? 'text' : 'password'"
+                      :placeholder="editingProvider.has_secret ? '•••••• 已配置（留空保持不变）' : 'API Key'"
+                      class="field__mono"
+                      show-password
+                    />
+                  </div>
+                  <div class="field">
+                    <label class="field__label">超时时间（秒）</label>
+                    <el-input-number v-model="formFields.crawler_timeout" :min="0" :controls="false" placeholder="30" />
+                  </div>
+                </template>
+
+                <!-- Default switch -->
+                <div class="field-switch">
+                  <el-switch
+                    :model-value="editingProvider.is_default"
+                    :disabled="settingDefault || editingProvider.is_default"
+                    @change="handleSetDefault"
+                  />
+                  <span class="field-switch__label">
+                    设为「{{ getProviderLabel(editingProvider.provider_type) }}」类别的默认服务
+                  </span>
+                </div>
               </div>
             </div>
-            <div class="wechat-card-body">
-              <div class="wechat-field">
-                <span class="field-label">AppID</span>
-                <span class="field-value">{{ acct.app_id }}</span>
-              </div>
-              <div class="wechat-field">
-                <span class="field-label">令牌模式</span>
-                <span class="field-value">{{ getTokenModeLabel(acct.token_mode) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
 
-    <!-- WeChat Dialog -->
-    <teleport to="body">
-      <div v-if="showWechatDialog" class="dialog-overlay" @click.self="showWechatDialog = false">
-        <div class="dialog-panel">
-          <div class="dialog-header">
-            <h3>添加公众号</h3>
-            <button class="dialog-close" @click="showWechatDialog = false">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-          <div class="dialog-body">
-            <div class="form-group">
-              <label class="form-label">名称 <span class="required">*</span></label>
-              <input v-model="wechatForm.name" class="mono-input" placeholder="公众号名称" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">AppID <span class="required">*</span></label>
-              <input v-model="wechatForm.app_id" class="mono-input" placeholder="公众号 AppID" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">AppSecret</label>
-              <div class="input-with-toggle">
-                <input
-                  v-model="wechatForm.app_secret"
-                  :type="showWechatSecret ? 'text' : 'password'"
-                  class="mono-input mono-key"
-                  placeholder="公众号 AppSecret"
-                />
-                <button type="button" class="toggle-btn" @click="showWechatSecret = !showWechatSecret">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                  </svg>
+            <div class="action-bar">
+              <button class="btn-danger-ghost" @click="handleDeleteProvider">删除服务</button>
+              <div class="action-bar__right">
+                <button class="btn-ghost" :disabled="testingConnection" @click="handleTestConnection">
+                  <span v-if="testingConnection" class="mini-spinner"></span>
+                  测试连接
+                </button>
+                <button class="btn-primary" :disabled="providerSaving" @click="handleUpdateProvider">
+                  <span v-if="providerSaving" class="mini-spinner mini-spinner--inverse"></span>
+                  保存
                 </button>
               </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">令牌模式 <span class="required">*</span></label>
-              <div class="select-wrapper">
-                <select v-model="wechatForm.token_mode" class="mono-select">
-                  <option v-for="(label, key) in TOKEN_MODE_LABELS" :key="key" :value="key">{{ label }}</option>
-                </select>
+          </template>
+        </template>
+
+        <!-- ============== EXTENSION FLOW ============== -->
+        <template v-else-if="activeTab === 'extension'">
+          <div class="edit-header">
+            <div class="edit-header__title-row">
+              <h2 class="edit-header__title">浏览器插件</h2>
+              <MonoChip>EXTENSION</MonoChip>
+            </div>
+            <p class="edit-header__desc">
+              个人公众号无法获得 draft/add API 权限。安装 ReadBud 浏览器插件后，
+              点击「发布」会自动跳转到 mp.weixin.qq.com 编辑器并填好标题、正文、封面，
+              你只需在 WeChat 编辑器里点「群发」即可。
+            </p>
+          </div>
+
+          <div class="form-card form-card--guide">
+            <h3 class="guide-h3">1 · 安装插件</h3>
+            <ol class="guide-list">
+              <li>下载 <code>wechat-extension</code> 目录（在 ReadBud 仓库根目录下）。</li>
+              <li>打开 Chrome / Edge，进入 <code>chrome://extensions</code>。</li>
+              <li>开启「开发者模式」（页面右上角开关）。</li>
+              <li>点击「加载已解压的扩展程序」，选择 <code>wechat-extension</code> 文件夹。</li>
+              <li>插件出现在工具栏，点击图标 → 粘贴下方签发的令牌 → 完成。</li>
+            </ol>
+
+            <h3 class="guide-h3">2 · 签发插件令牌</h3>
+            <p class="guide-p">
+              令牌是插件访问 ReadBud 数据的凭据。<strong>仅在签发那一刻显示一次，请立刻复制保存。</strong>
+              丢失后只能重新签发。
+            </p>
+
+            <div class="token-issue-row">
+              <el-input
+                v-model="extensionTokenName"
+                placeholder="备注名称（如：Chrome · 工作机）"
+                style="max-width: 280px"
+              />
+              <button class="btn-primary" :disabled="extensionTokenIssuing" @click="handleIssueExtensionToken">
+                <span v-if="extensionTokenIssuing" class="mini-spinner mini-spinner--inverse"></span>
+                签发新令牌
+              </button>
+            </div>
+
+            <div v-if="extensionTokenJustIssued" class="token-issued">
+              <div class="token-issued__head">
+                <span class="token-issued__label">新令牌（仅显示一次）</span>
+                <button class="text-link" @click="copyExtensionToken">复制</button>
+              </div>
+              <code class="token-issued__value">{{ extensionTokenJustIssued }}</code>
+            </div>
+
+            <h3 class="guide-h3">3 · 已签发的令牌</h3>
+            <div v-if="extensionTokensLoading" class="list-col__state">
+              <span class="mini-spinner"></span>
+              <span>加载中…</span>
+            </div>
+            <div v-else-if="extensionTokens.length === 0" class="guide-empty">
+              尚未签发任何令牌
+            </div>
+            <ul v-else class="token-list">
+              <li v-for="t in extensionTokens" :key="t.id" class="token-list__item">
+                <div class="token-list__main">
+                  <span class="token-list__name">{{ t.name }}</span>
+                  <code class="token-list__prefix">{{ t.token_prefix }}…</code>
+                </div>
+                <div class="token-list__meta">
+                  <span v-if="t.revoked_at" class="token-list__state token-list__state--revoked">已撤销</span>
+                  <span v-else-if="t.last_used_at">最近使用 {{ formatTokenDate(t.last_used_at) }}</span>
+                  <span v-else>从未使用</span>
+                </div>
+                <button
+                  v-if="!t.revoked_at"
+                  class="btn-danger-ghost"
+                  @click="handleRevokeExtensionToken(t)"
+                >撤销</button>
+              </li>
+            </ul>
+          </div>
+        </template>
+
+        <!-- ============== WECHAT FLOW ============== -->
+        <template v-else-if="activeTab === 'wechat'">
+          <div v-if="!editingWechat && !isAddingWechat" class="empty-card">
+            <div class="empty-card__code">EMPTY · 选择左侧公众号查看配置</div>
+          </div>
+
+          <template v-else-if="isAddingWechat || editingWechat">
+            <div class="edit-header">
+              <div class="edit-header__title-row">
+                <h2 class="edit-header__title">
+                  {{ isAddingWechat ? '添加公众号' : (editingWechat?.name || '') }}
+                </h2>
+                <MonoChip v-if="editingWechat">{{ getTokenModeLabel(editingWechat.token_mode) }}</MonoChip>
+                <div class="edit-header__spacer" />
+                <div v-if="editingWechat" class="edit-header__status">
+                  <StatusDot :kind="editingWechat.status === 1 ? 'sprout' : 'mute'" :size="6" />
+                  <span>{{ editingWechat.status === 1 ? '已启用' : '未启用' }}</span>
+                </div>
+              </div>
+              <p class="edit-header__desc">
+                配置微信公众号的 AppID 与 AppSecret，用于发布与素材上传。
+              </p>
+            </div>
+
+            <div class="form-card">
+              <div class="form-grid">
+                <div class="field">
+                  <label class="field__label">名称 <span class="field__required">*</span></label>
+                  <el-input v-model="wechatForm.name" placeholder="公众号名称" />
+                </div>
+                <div class="field">
+                  <label class="field__label">AppID <span class="field__required">*</span></label>
+                  <el-input v-model="wechatForm.app_id" placeholder="公众号 AppID" class="field__mono" />
+                </div>
+                <div class="field">
+                  <label class="field__label">AppSecret</label>
+                  <el-input
+                    v-model="wechatForm.app_secret"
+                    :type="showWechatSecret ? 'text' : 'password'"
+                    :placeholder="editingWechat ? '•••••• 已配置（留空保持不变）' : '公众号 AppSecret'"
+                    class="field__mono"
+                    show-password
+                  />
+                </div>
+                <div class="field">
+                  <label class="field__label">令牌模式 <span class="field__required">*</span></label>
+                  <el-select v-model="wechatForm.token_mode">
+                    <el-option
+                      v-for="(label, key) in TOKEN_MODE_LABELS"
+                      :key="key"
+                      :value="key"
+                      :label="label"
+                    />
+                  </el-select>
+                </div>
+                <div class="field">
+                  <label class="field__label">发布方式 <span class="field__required">*</span></label>
+                  <div class="delivery-grid">
+                    <button
+                      v-for="(label, key) in DELIVERY_MODE_LABELS"
+                      :key="key"
+                      type="button"
+                      class="delivery-card"
+                      :class="{ 'delivery-card--active': wechatForm.delivery_mode === key }"
+                      @click="wechatForm.delivery_mode = key as DeliveryMode"
+                    >
+                      <span class="delivery-card__title">{{ label }}</span>
+                      <span class="delivery-card__hint">{{ DELIVERY_MODE_HINTS[key as DeliveryMode] }}</span>
+                    </button>
+                  </div>
+                  <p v-if="wechatForm.delivery_mode === 'api'" class="field__hint-line">
+                    需要服务号 + 微信认证。个人订阅号会被 WeChat 拒绝（48001 api unauthorized）。
+                  </p>
+                  <p v-else-if="wechatForm.delivery_mode === 'extension'" class="field__hint-line">
+                    点击「浏览器插件」面板查看安装步骤并签发插件令牌。
+                  </p>
+                </div>
+                <div class="field">
+                  <label class="field__label">备注</label>
+                  <el-input
+                    v-model="wechatForm.remark"
+                    type="textarea"
+                    :rows="3"
+                    placeholder="备注信息"
+                  />
+                </div>
+                <div class="field-switch">
+                  <el-switch v-model="wechatForm.is_default" />
+                  <span class="field-switch__label">设为默认公众号</span>
+                </div>
               </div>
             </div>
-            <div class="form-group form-row-inline">
-              <label class="toggle-label">
-                <input type="checkbox" v-model="wechatForm.is_default" class="mono-checkbox" />
-                <span>设为默认</span>
-              </label>
+
+            <div class="action-bar">
+              <button v-if="editingWechat" class="btn-danger-ghost" @click="handleDeleteWechat">删除公众号</button>
+              <button v-else class="btn-ghost" @click="cancelWechatEdit">取消</button>
+              <div class="action-bar__right">
+                <button class="btn-primary" :disabled="wechatSaving" @click="handleSaveWechat">
+                  <span v-if="wechatSaving" class="mini-spinner mini-spinner--inverse"></span>
+                  保存
+                </button>
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">备注</label>
-              <input v-model="wechatForm.remark" class="mono-input" placeholder="备注信息" />
-            </div>
-          </div>
-          <div class="dialog-footer">
-            <button class="btn-secondary" @click="showWechatDialog = false">取消</button>
-            <button class="btn-primary" :disabled="wechatSaving" @click="handleCreateWechat">
-              <span v-if="wechatSaving" class="mini-spinner"></span>
-              保存
-            </button>
-          </div>
-        </div>
-      </div>
-    </teleport>
+          </template>
+        </template>
+      </section>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listProviders, createProvider, listWechatAccounts, createWechatAccount } from '@/api/provider'
@@ -805,16 +814,57 @@ import { patch, del, post } from '@/api/request'
 import {
   PROVIDER_TYPE_LABELS,
   TOKEN_MODE_LABELS,
+  DELIVERY_MODE_LABELS,
+  DELIVERY_MODE_HINTS,
 } from '@/types/provider'
 import type {
   ProviderConfigVO,
   ProviderType,
   WechatAccountVO,
   TokenMode,
+  DeliveryMode,
+  ExtensionTokenVO,
 } from '@/types/provider'
+import {
+  listExtensionTokens,
+  issueExtensionToken,
+  revokeExtensionToken,
+} from '@/api/extension'
+import AppTopBar from '@/components/common/AppTopBar.vue'
+import StatusDot from '@/components/common/StatusDot.vue'
+import MonoChip from '@/components/common/MonoChip.vue'
+import SectionLabel from '@/components/common/SectionLabel.vue'
 
 const router = useRouter()
-const activeTab = ref('providers')
+const activeTab = ref<'providers' | 'wechat' | 'extension'>('providers')
+
+// ---- Sidebar nav items ----
+interface NavItem {
+  key: string
+  label: string
+  tab?: 'providers' | 'wechat' | 'extension'
+  disabled?: boolean
+}
+
+const navItems: NavItem[] = [
+  { key: 'providers', label: '服务配置', tab: 'providers' },
+  { key: 'wechat', label: '公众号管理', tab: 'wechat' },
+  { key: 'extension', label: '浏览器插件', tab: 'extension' },
+  { key: 'templates', label: '模板与风格', disabled: true },
+  { key: 'team', label: '账户与团队', disabled: true },
+  { key: 'billing', label: '计费 · 用量', disabled: true },
+  { key: 'notify', label: '通知偏好', disabled: true },
+]
+
+function onNavClick(item: NavItem) {
+  if (item.disabled) {
+    ElMessage.info('即将上线')
+    return
+  }
+  if (item.tab) {
+    activeTab.value = item.tab
+  }
+}
 
 // ---- Provider state ----
 const providers = ref<ProviderConfigVO[]>([])
@@ -953,7 +1003,7 @@ function buildConfigJson(providerType: string): Record<string, unknown> {
 }
 
 // Build secret_json based on provider type
-function buildSecretJson(providerType: string): string | undefined {
+function buildSecretJson(_providerType: string): string | undefined {
   return formFields.api_key || undefined
 }
 
@@ -984,21 +1034,90 @@ function getProviderLabel(type_: string): string {
   return PROVIDER_TYPE_LABELS[type_ as ProviderType] || type_
 }
 
+const PROVIDER_TYPE_CODE: Record<string, string> = {
+  llm: 'AI',
+  image_search: 'IS',
+  image_gen: 'IG',
+  search: 'SE',
+  storage: 'ST',
+  crawler: 'CR',
+}
+
 function getProviderIcon(type_: string): string {
-  const map: Record<string, string> = {
-    llm: 'AI',
-    image_search: 'IS',
-    image_gen: 'IG',
-    search: 'SE',
-    storage: 'ST',
-    crawler: 'CR',
-  }
-  return map[type_] || '??'
+  return PROVIDER_TYPE_CODE[type_] || '??'
 }
 
 function getTokenModeLabel(mode: string): string {
   return TOKEN_MODE_LABELS[mode as TokenMode] || mode
 }
+
+// ---- Computed list metrics ----
+const providerCountLabel = computed(() => {
+  const n = providers.value.length
+  return n.toString().padStart(2, '0')
+})
+
+const providerSubtitle = computed(() => {
+  const total = providers.value.length
+  const defaults = providers.value.filter(p => p.is_default).length
+  if (total === 0) return '尚未接入任何服务'
+  return `${total} 个已接入 · ${defaults} 个为默认`
+})
+
+const wechatCountLabel = computed(() => {
+  const n = wechatAccounts.value.length
+  return n.toString().padStart(2, '0')
+})
+
+const wechatSubtitle = computed(() => {
+  const total = wechatAccounts.value.length
+  const defaults = wechatAccounts.value.filter(a => a.is_default).length
+  if (total === 0) return '尚未添加公众号'
+  return `${total} 个已绑定 · ${defaults} 个为默认`
+})
+
+// ---- Search hint helpers ----
+const searchKeyPlaceholder = computed(() => {
+  switch (formFields.search_provider) {
+    case 'tavily': return 'tvly-xxxx'
+    case 'serpapi': return 'SerpAPI Key'
+    case 'bing': return 'Bing Search API Key'
+    default: return 'API Key'
+  }
+})
+
+const searchKeyHint = computed(() => {
+  switch (formFields.search_provider) {
+    case 'tavily': return '在 https://app.tavily.com 注册获取，免费 1000 次/月'
+    case 'serpapi': return '在 https://serpapi.com/dashboard 获取，免费 100 次/月'
+    case 'bing': return '在 Azure Portal → Cognitive Services → Bing Search 获取'
+    default: return ''
+  }
+})
+
+const imageSearchHint = computed(() => {
+  switch (formFields.image_search_provider) {
+    case 'unsplash': return '在 https://unsplash.com/developers 注册应用获取'
+    case 'pexels': return '在 https://www.pexels.com/api/ 注册获取'
+    default: return '在 Azure Portal → Bing Image Search 获取'
+  }
+})
+
+const crawlerKeyPlaceholder = computed(() => {
+  switch (formFields.crawler_provider) {
+    case 'jina': return 'jina_xxxx'
+    case 'firecrawl': return 'fc-xxxx'
+    default: return '留空则不传认证'
+  }
+})
+
+const crawlerKeyHint = computed(() => {
+  switch (formFields.crawler_provider) {
+    case 'jina': return '在 https://jina.ai/reader 获取，有免费额度'
+    case 'firecrawl': return '在 https://firecrawl.dev 注册获取'
+    default: return ''
+  }
+})
 
 // ---- API calls ----
 async function loadProviders() {
@@ -1127,6 +1246,7 @@ async function handleTestConnection() {
 
 async function handleSetDefault() {
   if (!editingProvider.value) return
+  if (editingProvider.value.is_default) return
   settingDefault.value = true
   try {
     await post(`/providers/${editingProvider.value.id}/set-default`)
@@ -1146,16 +1266,57 @@ const wechatAccounts = ref<WechatAccountVO[]>([])
 const wechatLoading = ref(false)
 const wechatSaving = ref(false)
 const wechatError = ref<string | null>(null)
-const showWechatDialog = ref(false)
 const showWechatSecret = ref(false)
+const selectedWechatId = ref<string | null>(null)
+const editingWechat = ref<WechatAccountVO | null>(null)
+const isAddingWechat = ref(false)
 const wechatForm = reactive({
   name: '',
   app_id: '',
   app_secret: '',
   token_mode: 'direct' as TokenMode,
+  delivery_mode: 'extension' as DeliveryMode,
   is_default: false,
   remark: '',
 })
+
+function resetWechatForm() {
+  wechatForm.name = ''
+  wechatForm.app_id = ''
+  wechatForm.app_secret = ''
+  wechatForm.token_mode = 'direct'
+  wechatForm.delivery_mode = 'extension'
+  wechatForm.is_default = false
+  wechatForm.remark = ''
+  showWechatSecret.value = false
+}
+
+function selectWechatAccount(acct: WechatAccountVO) {
+  isAddingWechat.value = false
+  selectedWechatId.value = acct.id
+  editingWechat.value = acct
+  wechatForm.name = acct.name
+  wechatForm.app_id = acct.app_id
+  wechatForm.app_secret = ''
+  wechatForm.token_mode = acct.token_mode
+  wechatForm.delivery_mode = acct.delivery_mode || 'extension'
+  wechatForm.is_default = acct.is_default
+  wechatForm.remark = acct.remark || ''
+}
+
+function startAddWechat() {
+  editingWechat.value = null
+  selectedWechatId.value = null
+  isAddingWechat.value = true
+  resetWechatForm()
+}
+
+function cancelWechatEdit() {
+  isAddingWechat.value = false
+  editingWechat.value = null
+  selectedWechatId.value = null
+  resetWechatForm()
+}
 
 async function loadWechatAccounts() {
   wechatLoading.value = true
@@ -1172,7 +1333,7 @@ async function loadWechatAccounts() {
   }
 }
 
-async function handleCreateWechat() {
+async function handleSaveWechat() {
   if (!wechatForm.name || !wechatForm.app_id) {
     ElMessage.warning('请填写必要信息')
     return
@@ -1180,22 +1341,44 @@ async function handleCreateWechat() {
 
   wechatSaving.value = true
   try {
-    const resp = await createWechatAccount({
-      name: wechatForm.name,
-      app_id: wechatForm.app_id,
-      app_secret: wechatForm.app_secret || undefined,
-      token_mode: wechatForm.token_mode,
-      is_default: wechatForm.is_default,
-      remark: wechatForm.remark,
-    })
-    if (resp.code === 0) {
-      ElMessage.success('公众号已保存')
-      showWechatDialog.value = false
-      wechatForm.name = ''
-      wechatForm.app_id = ''
-      wechatForm.app_secret = ''
-      wechatForm.remark = ''
+    if (editingWechat.value) {
+      // Update existing
+      const payload: Record<string, unknown> = {
+        name: wechatForm.name,
+        app_id: wechatForm.app_id,
+        token_mode: wechatForm.token_mode,
+        delivery_mode: wechatForm.delivery_mode,
+        is_default: wechatForm.is_default,
+        remark: wechatForm.remark,
+      }
+      if (wechatForm.app_secret) {
+        payload.app_secret = wechatForm.app_secret
+      }
+      await patch(`/wechat-accounts/${editingWechat.value.id}`, payload)
+      ElMessage.success('已保存')
       await loadWechatAccounts()
+      const updated = wechatAccounts.value.find(a => a.id === editingWechat.value?.id)
+      if (updated) selectWechatAccount(updated)
+    } else {
+      // Create new
+      const resp = await createWechatAccount({
+        name: wechatForm.name,
+        app_id: wechatForm.app_id,
+        app_secret: wechatForm.app_secret || undefined,
+        token_mode: wechatForm.token_mode,
+        delivery_mode: wechatForm.delivery_mode,
+        is_default: wechatForm.is_default,
+        remark: wechatForm.remark,
+      })
+      if (resp.code === 0) {
+        ElMessage.success('公众号已保存')
+        isAddingWechat.value = false
+        resetWechatForm()
+        await loadWechatAccounts()
+        if (resp.data) {
+          selectWechatAccount(resp.data)
+        }
+      }
     }
   } catch {
     ElMessage.error('保存失败')
@@ -1204,9 +1387,118 @@ async function handleCreateWechat() {
   }
 }
 
+async function handleDeleteWechat() {
+  if (!editingWechat.value) return
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除「${editingWechat.value.name}」吗？此操作不可恢复。`,
+      '确认删除',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+
+  try {
+    await del(`/wechat-accounts/${editingWechat.value.id}`)
+    ElMessage.success('已删除')
+    editingWechat.value = null
+    selectedWechatId.value = null
+    resetWechatForm()
+    await loadWechatAccounts()
+  } catch {
+    ElMessage.error('删除失败')
+  }
+}
+
+// ---- Extension token state ----
+const extensionTokens = ref<ExtensionTokenVO[]>([])
+const extensionTokensLoading = ref(false)
+const extensionTokenName = ref('')
+const extensionTokenIssuing = ref(false)
+const extensionTokenJustIssued = ref<string | null>(null)
+
+async function loadExtensionTokens() {
+  extensionTokensLoading.value = true
+  try {
+    const resp = await listExtensionTokens()
+    if (resp.code === 0) {
+      extensionTokens.value = resp.data || []
+    }
+  } catch {
+    ElMessage.error('加载插件令牌失败')
+  } finally {
+    extensionTokensLoading.value = false
+  }
+}
+
+async function handleIssueExtensionToken() {
+  extensionTokenIssuing.value = true
+  try {
+    const resp = await issueExtensionToken({
+      name: extensionTokenName.value || undefined,
+    })
+    if (resp.code === 0 && resp.data) {
+      extensionTokenJustIssued.value = resp.data.token
+      extensionTokenName.value = ''
+      ElMessage.success('令牌已签发,请立刻复制保存')
+      await loadExtensionTokens()
+    }
+  } catch {
+    ElMessage.error('签发失败')
+  } finally {
+    extensionTokenIssuing.value = false
+  }
+}
+
+async function copyExtensionToken() {
+  if (!extensionTokenJustIssued.value) return
+  try {
+    await navigator.clipboard.writeText(extensionTokenJustIssued.value)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    ElMessage.warning('复制失败,请手动复制')
+  }
+}
+
+async function handleRevokeExtensionToken(t: ExtensionTokenVO) {
+  try {
+    await ElMessageBox.confirm(
+      `撤销「${t.name}」后，使用该令牌的浏览器插件将立即失效。继续吗？`,
+      '撤销令牌',
+      { confirmButtonText: '撤销', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await revokeExtensionToken(t.id)
+    ElMessage.success('已撤销')
+    await loadExtensionTokens()
+  } catch {
+    ElMessage.error('撤销失败')
+  }
+}
+
+function formatTokenDate(s?: string): string {
+  if (!s) return ''
+  try {
+    return new Date(s).toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return s
+  }
+}
+
 onMounted(() => {
   loadProviders()
   loadWechatAccounts()
+  loadExtensionTokens()
 })
 </script>
 
@@ -1214,940 +1506,780 @@ onMounted(() => {
 @use '@/styles/tokens' as *;
 
 // ============================================================
-// Settings page — Monochrome
+// Settings page — 阅芽 优化方案
 // ============================================================
 
 .settings-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--surface-bg);
-}
-
-// --- Header ---
-.settings-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 60px;
-  padding: 0 $spacing-xl;
-  background: var(--surface-bg);
-  border-bottom: 1px solid var(--border-light);
-  position: sticky;
-  top: 0;
-  z-index: $z-sticky;
-}
-
-.header-brand {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-}
-
-.header-title {
-  font-size: $font-size-lg;
-  font-weight: $font-weight-bold;
+  background: var(--brand-paper);
+  font-family: var(--font-sans);
   color: var(--text-primary);
 }
 
-.header-divider {
-  color: var(--border-medium);
-}
-
-.header-desc {
-  font-size: $font-size-base;
-  color: $text-secondary;
-}
-
-.back-btn {
-  display: flex;
-  align-items: center;
-  gap: $spacing-xs;
-  background: var(--surface-bg);
-  border: 1px solid var(--border-light);
-  border-radius: $radius-md;
-  color: $text-secondary;
-  padding: $spacing-sm $spacing-md;
-  font-size: $font-size-sm;
-  cursor: pointer;
-  transition: all $transition-base;
-
-  &:hover {
-    border-color: var(--border-medium);
-    color: var(--text-primary);
-    background: var(--surface-tertiary);
-  }
-}
-
-// --- Tab bar ---
-.tab-bar {
-  display: flex;
-  gap: $spacing-xs;
-  padding: $spacing-base $spacing-xl;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.tab-item {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-base;
+.rail-btn {
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: $radius-md;
-  color: $text-tertiary;
-  font-size: $font-size-sm;
+  border: none;
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
   cursor: pointer;
-  transition: all $transition-base;
+  transition: color 120ms ease;
 
   &:hover {
-    color: $text-secondary;
-    background: var(--surface-tertiary);
-  }
-
-  &.active {
     color: var(--text-primary);
-    background: var(--surface-tertiary);
-    border-color: var(--border-light);
-    font-weight: $font-weight-medium;
   }
 }
 
-// --- Body ---
-.settings-body {
+// ===== Three-column shell =====
+.settings-shell {
   flex: 1;
-  padding: $spacing-xl;
-  max-width: 1200px;
-  width: 100%;
-  margin: 0 auto;
-}
-
-// --- Split layout ---
-.split-layout {
   display: flex;
-  gap: $spacing-xl;
-  height: calc(100vh - 60px - 56px - 48px);
-  min-height: 500px;
+  min-height: 0;
 }
 
-// --- Sidebar ---
-.provider-sidebar {
-  width: 280px;
+// ===== COL 1: Sidebar nav =====
+.nav-rail {
+  width: 220px;
   flex-shrink: 0;
+  border-right: 1px solid var(--border-hair);
+  background: var(--surface-card);
+  padding: 24px 16px;
   display: flex;
   flex-direction: column;
-  background: var(--surface-bg);
-  border: 1px solid var(--border-light);
-  border-radius: $radius-lg;
-  overflow: hidden;
+
+  &__label {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    letter-spacing: 0.15em;
+    padding: 0 8px;
+    margin-bottom: 12px;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
 }
 
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: $spacing-base;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.sidebar-title {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-semibold;
-  color: $text-secondary;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.sidebar-count {
-  font-size: $font-size-xs;
-  color: $text-tertiary;
-  background: var(--surface-tertiary);
-  padding: 2px 8px;
-  border-radius: $radius-full;
-}
-
-.sidebar-loading,
-.sidebar-error {
-  padding: $spacing-xl;
-  text-align: center;
-  color: $text-tertiary;
-  font-size: $font-size-sm;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: $spacing-sm;
-}
-
-.sidebar-empty {
-  padding: $spacing-2xl $spacing-base;
-  text-align: center;
-  color: $text-tertiary;
-  font-size: $font-size-sm;
-}
-
-.provider-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: $spacing-sm;
-}
-
-.provider-item {
-  display: flex;
-  align-items: center;
-  gap: $spacing-md;
-  width: 100%;
-  padding: $spacing-md;
+.nav-item {
+  position: relative;
+  height: 34px;
+  padding: 0 12px 0 14px;
   background: transparent;
-  border: 1px solid transparent;
-  border-left: 4px solid transparent;
-  border-radius: $radius-md;
+  border: none;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-body);
+  font-size: 13px;
   cursor: pointer;
-  transition: all $transition-base;
+  transition: background 120ms ease, color 120ms ease;
   text-align: left;
 
-  &:hover {
-    background: var(--surface-tertiary);
-  }
-
-  &.active {
-    background: var(--surface-tertiary);
-    border-left-color: var(--text-primary);
-  }
-
-  & + & {
-    margin-top: 2px;
-  }
-}
-
-.provider-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: $radius-md;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: $font-size-xs;
-  font-weight: $font-weight-bold;
-  flex-shrink: 0;
-  background: var(--surface-tertiary);
-  color: var(--text-secondary);
-}
-
-.provider-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.provider-name {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.provider-type-label {
-  font-size: $font-size-xs;
-  color: $text-tertiary;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--border-medium);
-
-  &.online {
-    background: $status-success;
-  }
-}
-
-.add-provider-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-sm;
-  padding: $spacing-md;
-  border-top: 1px solid var(--border-light);
-  background: transparent;
-  border-left: none;
-  border-right: none;
-  border-bottom: none;
-  color: $text-secondary;
-  font-size: $font-size-sm;
-  cursor: pointer;
-  transition: all $transition-base;
-
-  &:hover {
-    background: var(--surface-tertiary);
-    color: var(--text-primary);
-  }
-}
-
-// --- Detail panel ---
-.provider-detail {
-  flex: 1;
-  min-width: 0;
-  background: var(--surface-bg);
-  border: 1px solid var(--border-light);
-  border-radius: $radius-lg;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.detail-empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-base;
-  color: $text-tertiary;
-  font-size: $font-size-sm;
-}
-
-.detail-form {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.detail-header {
-  display: flex;
-  align-items: center;
-  gap: $spacing-md;
-  padding: $spacing-lg $spacing-xl;
-  border-bottom: 1px solid var(--border-light);
-
-  h3 {
-    font-size: $font-size-md;
-    font-weight: $font-weight-bold;
-    color: var(--text-primary);
-  }
-}
-
-.type-badge {
-  font-size: $font-size-xs;
-  padding: 2px $spacing-sm;
-  border-radius: $radius-full;
-  font-weight: $font-weight-medium;
-  background: var(--surface-tertiary);
-  color: var(--text-secondary);
-}
-
-.form-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: $spacing-xl;
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-lg;
-}
-
-.detail-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: $spacing-base $spacing-xl;
-  border-top: 1px solid var(--border-light);
-}
-
-.actions-right {
-  display: flex;
-  gap: $spacing-sm;
-}
-
-// --- Form elements ---
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
-}
-
-.form-label {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  color: $text-secondary;
-  display: flex;
-  align-items: center;
-  gap: $spacing-xs;
-}
-
-.label-value {
-  color: var(--text-primary);
-  font-weight: $font-weight-normal;
-}
-
-.required {
-  color: $status-danger;
-}
-
-.form-hint {
-  display: block;
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  line-height: 1.4;
-}
-
-.mono-checkbox {
-  margin-right: 6px;
-  accent-color: var(--text-primary);
-}
-
-.form-row {
-  display: flex;
-  gap: $spacing-base;
-}
-
-.flex-1 {
-  flex: 1;
-}
-
-.mono-input {
-  background: var(--surface-bg);
-  border: 1px solid var(--border-light);
-  border-radius: $radius-md;
-  color: var(--text-primary);
-  padding: $spacing-sm $spacing-md;
-  font-size: $font-size-base;
-  width: 100%;
-  transition: all $transition-base;
-
-  &::placeholder {
-    color: $text-placeholder;
-  }
-
-  &:hover {
-    border-color: var(--border-medium);
-  }
-
-  &:focus {
-    border-color: var(--text-primary);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06);
-    outline: none;
-  }
-}
-
-.mono-key {
-  font-family: $font-mono;
-}
-
-.select-wrapper {
-  position: relative;
-
-  &::after {
-    content: '';
+  &__indicator {
     position: absolute;
-    right: $spacing-md;
+    left: 0;
     top: 50%;
     transform: translateY(-50%);
-    width: 0;
-    height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 5px solid $text-tertiary;
-    pointer-events: none;
-  }
-}
-
-.mono-select {
-  background: var(--surface-bg);
-  border: 1px solid var(--border-light);
-  border-radius: $radius-md;
-  color: var(--text-primary);
-  padding: $spacing-sm $spacing-2xl $spacing-sm $spacing-md;
-  font-size: $font-size-base;
-  width: 100%;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  transition: all $transition-base;
-
-  &:hover {
-    border-color: var(--border-medium);
+    width: 2px;
+    height: 16px;
+    background: transparent;
+    border-radius: 1px;
   }
 
-  &:focus {
-    border-color: var(--text-primary);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06);
-    outline: none;
+  &__label {
+    flex: 1;
+    line-height: 1;
   }
 
-  option {
-    background: var(--surface-bg);
+  &__chip {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--text-faint);
+    padding: 2px 5px;
+    border: 1px solid var(--border-hair-soft);
+    border-radius: 3px;
+  }
+
+  &:hover:not(&--disabled):not(&--active) {
+    background: var(--border-hair-soft);
     color: var(--text-primary);
   }
-}
 
-.mono-slider {
-  width: 100%;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--border-light);
-  outline: none;
-  margin-top: $spacing-sm;
+  &--active {
+    background: var(--border-hair-soft);
+    color: var(--text-primary);
+    font-weight: 500;
 
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: var(--text-primary);
-    border: 2px solid #fff;
-    cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    .nav-item__indicator {
+      background: var(--brand-ink);
+    }
   }
 
-  &::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: var(--text-primary);
-    border: 2px solid #fff;
-    cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-  }
-}
-
-.input-with-toggle {
-  position: relative;
-  display: flex;
-  align-items: stretch;
-
-  .mono-input {
-    padding-right: 40px;
-  }
-
-  .toggle-btn {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    color: $text-tertiary;
-    cursor: pointer;
-    transition: color $transition-fast;
+  &--disabled {
+    color: var(--text-faint);
+    cursor: default;
 
     &:hover {
-      color: $text-secondary;
+      background: transparent;
     }
   }
 }
 
-.mono-checkbox {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border: 1px solid var(--border-light);
-  border-radius: $radius-sm;
-  background: var(--surface-bg);
-  cursor: pointer;
-  position: relative;
-  transition: all $transition-base;
+// ===== COL 2: List column =====
+.list-col {
+  width: 320px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-hair);
+  background: var(--brand-paper);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
-  &:checked {
-    background: var(--text-primary);
-    border-color: var(--text-primary);
+  &__header {
+    padding: 22px 22px 4px;
+  }
 
-    &::after {
-      content: '';
-      position: absolute;
-      left: 5px;
-      top: 2px;
-      width: 6px;
-      height: 10px;
-      border: solid #fff;
-      border-width: 0 2px 2px 0;
-      transform: rotate(45deg);
+  &__head-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+
+    :deep(.section-label) {
+      margin-bottom: 0;
+      flex: 1;
     }
+  }
+
+  &__count {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.06em;
+    padding-top: 1px;
+  }
+
+  &__items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__state {
+    padding: 24px 22px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &--error {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+
+      p {
+        margin: 0;
+        color: var(--brand-danger);
+      }
+    }
+  }
+
+  &__empty-text {
+    margin: 24px 0;
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 12px;
   }
 }
 
-.toggle-label {
+.row-item {
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
-  color: $text-secondary;
-  font-size: $font-size-sm;
-  cursor: pointer;
-}
-
-.form-row-inline {
-  flex-direction: row;
-  align-items: center;
-}
-
-// --- Buttons ---
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-lg;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  border-radius: $radius-md;
-  cursor: pointer;
-  transition: all $transition-base;
-  background: var(--text-primary);
-  border: 1px solid var(--text-primary);
-  color: var(--text-inverse);
-
-  &:hover {
-    background: var(--surface-inverse);
-    border-color: var(--surface-inverse);
-  }
-
-  &:active {
-    transform: scale(0.98);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none !important;
-  }
-
-  &.small {
-    padding: $spacing-xs $spacing-md;
-    font-size: $font-size-xs;
-  }
-}
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-lg;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  border-radius: $radius-md;
-  cursor: pointer;
-  transition: all $transition-base;
-  background: var(--surface-bg);
-  border: 1px solid var(--border-light);
-  color: var(--text-primary);
-
-  &:hover {
-    background: var(--surface-tertiary);
-    border-color: var(--border-medium);
-  }
-
-  &:active {
-    transform: scale(0.98);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none !important;
-  }
-}
-
-.btn-danger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-lg;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  border-radius: $radius-md;
-  cursor: pointer;
-  transition: all $transition-base;
+  gap: 12px;
+  width: 100%;
   background: transparent;
   border: 1px solid transparent;
-  color: $status-danger;
+  border-radius: 4px;
+  padding: 12px 14px 12px 12px;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  transition: background 120ms ease, border-color 120ms ease;
 
-  &:hover {
-    background: #fef2f2;
+  &__icon {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border: 1px solid var(--border-hair);
+    border-radius: 4px;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+    background: var(--surface-card);
   }
 
-  &:active {
-    transform: scale(0.98);
+  &__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  &__title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__sub {
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+
+  &:hover:not(&--active) {
+    background: var(--surface-card);
+  }
+
+  &--active {
+    background: var(--surface-card);
+    border-color: var(--border-hair);
+    box-shadow: -2px 0 0 0 var(--brand-ink);
+
+    .row-item__icon {
+      border-color: var(--border-medium);
+      color: var(--text-primary);
+    }
   }
 }
 
-.text-btn {
+.add-cta {
+  margin: 0 12px 16px;
+  padding: 10px 14px;
+  background: transparent;
+  border: 1px dashed var(--border-medium);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+  font-family: var(--font-sans);
+
+  &:hover {
+    border-color: var(--brand-ink);
+    color: var(--text-primary);
+  }
+}
+
+.text-link {
   background: transparent;
   border: none;
-  color: $text-secondary;
-  font-size: $font-size-sm;
+  color: var(--brand-ink);
+  font-size: 12px;
   cursor: pointer;
-  transition: color $transition-fast;
+  padding: 0;
   text-decoration: underline;
-
-  &:hover {
-    color: var(--text-primary);
-  }
 }
 
-// --- WeChat panel ---
-.wechat-panel {
-  background: var(--surface-bg);
-  border: 1px solid var(--border-light);
-  border-radius: $radius-lg;
-  padding: $spacing-xl;
-}
-
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: $spacing-xl;
-}
-
-.panel-title {
-  font-size: $font-size-md;
-  font-weight: $font-weight-bold;
-  color: var(--text-primary);
-}
-
-.panel-loading,
-.panel-error,
-.panel-empty {
-  text-align: center;
-  padding: $spacing-3xl;
-  color: $text-tertiary;
-  font-size: $font-size-sm;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: $spacing-sm;
-}
-
-.wechat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: $spacing-base;
-}
-
-.wechat-card {
-  background: var(--surface-bg);
-  border: 1px solid var(--border-light);
-  border-radius: $radius-lg;
-  padding: $spacing-base;
-  transition: all $transition-base;
-
-  &:hover {
-    border-color: var(--border-medium);
-    box-shadow: $shadow-sm;
-  }
-}
-
-.wechat-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: $spacing-md;
-}
-
-.wechat-name {
-  font-size: $font-size-base;
-  font-weight: $font-weight-semibold;
-  color: var(--text-primary);
-}
-
-.wechat-badges {
-  display: flex;
-  gap: $spacing-xs;
-}
-
-.badge {
-  font-size: $font-size-xs;
-  padding: 2px $spacing-sm;
-  border-radius: $radius-full;
-  font-weight: $font-weight-medium;
-
-  &.badge-default { background: var(--border-light); color: var(--text-secondary); }
-  &.badge-success { background: #f0fdf4; color: #16a34a; }
-  &.badge-warning { background: #fefce8; color: #ca8a04; }
-  &.badge-muted { background: var(--surface-tertiary); color: $text-tertiary; }
-}
-
-.wechat-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
-}
-
-.wechat-field {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-}
-
-.field-label {
-  font-size: $font-size-xs;
-  color: $text-tertiary;
-  width: 60px;
-  flex-shrink: 0;
-}
-
-.field-value {
-  font-size: $font-size-sm;
-  color: $text-secondary;
-  font-family: $font-mono;
-}
-
-// --- Dialog ---
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: $z-modal;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
-}
-
-.dialog-panel {
-  width: 480px;
-  max-width: 92vw;
-  max-height: 90vh;
-  background: var(--surface-bg);
-  border: 1px solid var(--border-light);
-  border-radius: $radius-xl;
-  box-shadow: $shadow-lg;
-  display: flex;
-  flex-direction: column;
-}
-
-.dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: $spacing-lg $spacing-xl;
-  border-bottom: 1px solid var(--border-light);
-
-  h3 {
-    font-size: $font-size-md;
-    font-weight: $font-weight-bold;
-    color: var(--text-primary);
-  }
-}
-
-.dialog-close {
-  background: transparent;
-  border: none;
-  color: $text-tertiary;
-  cursor: pointer;
-  padding: $spacing-xs;
-  border-radius: $radius-sm;
-  transition: all $transition-fast;
-
-  &:hover {
-    color: var(--text-primary);
-    background: var(--surface-tertiary);
-  }
-}
-
-.dialog-body {
-  padding: $spacing-xl;
+// ===== COL 3: Edit column =====
+.edit-col {
+  flex: 1;
+  background: var(--brand-paper);
+  padding: 32px 40px 40px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: $spacing-lg;
+  gap: 24px;
+  min-width: 0;
 }
 
-.dialog-footer {
+.empty-card {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border-medium);
+  border-radius: 8px;
+  background: transparent;
+  min-height: 240px;
+
+  &__code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+  }
+}
+
+.edit-header {
   display: flex;
-  justify-content: flex-end;
-  gap: $spacing-sm;
-  padding: $spacing-base $spacing-xl;
-  border-top: 1px solid var(--border-light);
+  flex-direction: column;
+  gap: 10px;
+  max-width: 720px;
+
+  &__title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__title {
+    font-family: var(--font-serif);
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.2;
+  }
+
+  &__spacer {
+    flex: 1;
+  }
+
+  &__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+  }
+
+  &__desc {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-body);
+    margin: 0;
+  }
 }
 
-// --- Utilities ---
+// ===== Form card =====
+.form-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hair);
+  border-radius: 8px;
+  padding: 28px;
+  max-width: 600px;
+}
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  &__label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-body);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__hint {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.04em;
+  }
+
+  &__hint-line {
+    margin: 4px 0 0;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+  }
+
+  &__required {
+    color: var(--brand-danger);
+  }
+
+  // mono input flavor (api keys, app ids)
+  &__mono :deep(.el-input__inner),
+  &__mono :deep(input) {
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+  }
+
+  :deep(.el-input-number) {
+    width: 100%;
+  }
+
+  :deep(.el-input-number .el-input__inner) {
+    text-align: left;
+  }
+
+  :deep(.el-select) {
+    width: 100%;
+  }
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.field-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+
+  &__label {
+    font-size: 12px;
+    color: var(--text-body);
+  }
+}
+
+// ===== Bottom action bar =====
+.action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 600px;
+  padding-top: 4px;
+
+  &__right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+%btn-base {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  white-space: nowrap;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.btn-primary {
+  @extend %btn-base;
+  background: var(--brand-ink);
+  color: var(--text-inverse);
+  border: 1px solid var(--brand-ink);
+
+  &:hover:not(:disabled) {
+    background: var(--brand-ink-soft);
+  }
+}
+
+.btn-ghost {
+  @extend %btn-base;
+  background: transparent;
+  color: var(--text-body);
+  border: 1px solid var(--border-medium);
+
+  &:hover:not(:disabled) {
+    border-color: var(--brand-ink);
+    color: var(--text-primary);
+  }
+}
+
+.btn-danger-ghost {
+  @extend %btn-base;
+  background: transparent;
+  color: var(--brand-danger);
+  border: 1px solid transparent;
+
+  &:hover:not(:disabled) {
+    border-color: var(--brand-danger);
+    background: var(--brand-danger-soft);
+  }
+}
+
+// ===== Spinner =====
 .mini-spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--border-medium);
-  border-top-color: var(--text-primary);
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--border-medium);
+  border-top-color: var(--brand-ink);
   border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+
+  &--inverse {
+    border-color: rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+  }
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-// --- Responsive ---
-@media (max-width: $breakpoint-md) {
-  .split-layout {
-    flex-direction: column;
-    height: auto;
+// ===== Delivery mode card grid =====
+.delivery-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.delivery-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 12px 14px;
+  background: var(--brand-paper);
+  border: 1px solid var(--border-hair);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+
+  &__title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
   }
 
-  .provider-sidebar {
-    width: 100%;
-    max-height: 300px;
+  &__hint {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    line-height: 1.5;
   }
 
-  .provider-detail {
-    min-height: 400px;
+  &:hover {
+    border-color: var(--border-medium);
   }
 
-  .settings-body {
-    padding: $spacing-base;
+  &--active {
+    border-color: var(--brand-ink);
+    background: var(--surface-card);
+    box-shadow: inset 2px 0 0 0 var(--brand-ink);
+
+    .delivery-card__title {
+      color: var(--brand-ink);
+    }
   }
 }
 
-@media (max-width: $breakpoint-sm) {
-  .settings-header {
-    height: 52px;
-    padding: 0 $spacing-base;
+// ===== Extension panel =====
+.form-card--guide {
+  max-width: 720px;
+}
+
+.guide-h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+  margin: 24px 0 12px;
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.guide-list,
+.guide-p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--text-body);
+}
+
+.guide-list {
+  padding-left: 20px;
+  margin: 0 0 8px;
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--brand-paper);
+    border: 1px solid var(--border-hair);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+}
+
+.guide-p {
+  margin: 0 0 12px;
+
+  strong {
+    color: var(--brand-danger);
+    font-weight: 500;
+  }
+}
+
+.guide-empty {
+  font-size: 12px;
+  color: var(--text-faint);
+  padding: 16px 0;
+}
+
+.token-issue-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.token-issued {
+  background: var(--brand-paper);
+  border: 1px dashed var(--brand-ink);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
   }
 
-  .header-desc,
-  .header-divider {
-    display: none;
+  &__label {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
   }
 
-  .tab-bar {
-    padding: $spacing-sm $spacing-base;
+  &__value {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    word-break: break-all;
+    color: var(--text-primary);
+    user-select: all;
+  }
+}
+
+.token-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--border-hair);
+    border-radius: 6px;
+    background: var(--brand-paper);
   }
 
-  .settings-body {
-    padding: $spacing-sm;
-  }
-
-  .form-row {
+  &__main {
+    flex: 1;
+    display: flex;
     flex-direction: column;
+    gap: 4px;
+    min-width: 0;
   }
 
-  .detail-actions {
-    flex-direction: column;
-    gap: $spacing-sm;
+  &__name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
   }
 
-  .actions-right {
-    width: 100%;
-    justify-content: flex-end;
+  &__prefix {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-tertiary);
   }
 
-  .wechat-grid {
-    grid-template-columns: 1fr;
+  &__meta {
+    font-size: 11px;
+    color: var(--text-tertiary);
   }
+
+  &__state--revoked {
+    color: var(--brand-danger);
+  }
+}
+
+// ===== Element Plus token overrides (scoped) =====
+:deep(.el-input__wrapper),
+:deep(.el-textarea__inner) {
+  background: var(--surface-card);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--border-hair) inset;
+  transition: box-shadow 120ms ease;
+
+  &:hover {
+    box-shadow: 0 0 0 1px var(--border-medium) inset;
+  }
+
+  &.is-focus {
+    box-shadow: 0 0 0 1px var(--brand-ink) inset;
+  }
+}
+
+:deep(.el-input__inner) {
+  font-size: 13px;
+  color: var(--text-primary);
+
+  &::placeholder {
+    color: var(--text-placeholder);
+  }
+}
+
+:deep(.el-select .el-input__wrapper) {
+  background: var(--surface-card);
+}
+
+:deep(.el-switch.is-checked .el-switch__core) {
+  background-color: var(--brand-ink) !important;
+  border-color: var(--brand-ink) !important;
+}
+
+:deep(.el-slider__bar) {
+  background-color: var(--brand-ink);
+}
+
+:deep(.el-slider__button) {
+  border-color: var(--brand-ink);
 }
 </style>

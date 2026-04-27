@@ -1,3 +1,9 @@
+<!--
+  Copyright (C) 2026 Leazoot
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  This file is part of ReadBud, licensed under the GNU AGPL v3.
+  See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+-->
 <template>
   <div class="distribution-panel">
     <!-- Header -->
@@ -50,7 +56,7 @@
     <!-- Content -->
     <div v-else class="panel-content">
       <!-- Community Copy -->
-      <div class="material-card">
+      <div class="mono-material-card">
         <div class="material-header">
           <span class="material-label">社群文案</span>
           <el-tooltip content="复制" placement="top">
@@ -66,7 +72,7 @@
       </div>
 
       <!-- Moments Copy -->
-      <div class="material-card">
+      <div class="mono-material-card">
         <div class="material-header">
           <span class="material-label">朋友圈文案</span>
           <el-tooltip content="复制" placement="top">
@@ -82,7 +88,7 @@
       </div>
 
       <!-- Summary Card -->
-      <div class="material-card">
+      <div class="mono-material-card">
         <div class="material-header">
           <span class="material-label">摘要卡片</span>
           <el-tooltip content="复制" placement="top">
@@ -98,7 +104,7 @@
       </div>
 
       <!-- Comment Guide -->
-      <div class="material-card">
+      <div class="mono-material-card">
         <div class="material-header">
           <span class="material-label">评论区引导语</span>
           <el-tooltip content="复制" placement="top">
@@ -114,7 +120,7 @@
       </div>
 
       <!-- Next Topic Suggestion -->
-      <div class="material-card">
+      <div class="mono-material-card">
         <div class="material-header">
           <span class="material-label">下篇选题建议</span>
           <el-tooltip content="复制" placement="top">
@@ -226,10 +232,9 @@ watch(() => props.draftPublicId, (newId) => {
 .distribution-panel {
   display: flex;
   flex-direction: column;
-  gap: $spacing-base;
+  gap: 16px;
 }
 
-// --- Header ---
 .panel-header {
   display: flex;
   align-items: center;
@@ -237,27 +242,44 @@ watch(() => props.draftPublicId, (newId) => {
 }
 
 .panel-title {
-  font-size: $font-size-md;
-  font-weight: $font-weight-semibold;
-  color: $color-text-primary;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0a0a0a;
   margin: 0;
 }
 
-// --- Loading / Empty / Generating ---
-.panel-loading {
-  padding: $spacing-xl 0;
+:deep(.el-button--primary) {
+  background: #0a0a0a !important;
+  border-color: #0a0a0a !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  &:hover { background: #333 !important; border-color: #333 !important; }
+}
+
+:deep(.el-button--danger) { color: #ef4444 !important; }
+
+:deep(.el-button) {
+  color: #525252 !important;
+  &:hover { color: #0a0a0a !important; }
+}
+
+.panel-loading { padding: 24px 0; }
+
+:deep(.el-skeleton) {
+  --el-skeleton-color: #f5f5f5;
+  --el-skeleton-to-color: #e8e8e8;
 }
 
 .panel-generating {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-3xl 0;
+  gap: 10px;
+  padding: 48px 0;
 }
 
 .generating-icon {
-  color: $color-accent;
+  color: #525252;
   animation: spin 1.2s linear infinite;
 }
 
@@ -267,58 +289,54 @@ watch(() => props.draftPublicId, (newId) => {
 }
 
 .generating-text {
-  font-size: $font-size-base;
-  font-weight: $font-weight-medium;
-  color: $color-text-primary;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0a0a0a;
   margin: 0;
 }
 
 .generating-hint {
-  font-size: $font-size-sm;
-  color: $color-text-muted;
+  font-size: 13px;
+  color: #d4d4d4;
   margin: 0;
 }
 
-.panel-empty {
-  padding: $spacing-2xl 0;
-}
+.panel-empty { padding: 32px 0; }
+
+:deep(.el-empty__description p) { color: #525252 !important; }
 
 .empty-text {
-  font-size: $font-size-sm;
-  color: $color-text-secondary;
-  margin: 0 0 $spacing-xs;
+  font-size: 13px;
+  color: #525252;
+  margin: 0 0 4px;
 }
 
 .empty-hint {
-  font-size: $font-size-xs;
-  color: $color-text-muted;
+  font-size: 12px;
+  color: #d4d4d4;
   margin: 0;
 }
 
-.panel-error {
-  padding: $spacing-xl 0;
-}
+.panel-error { padding: 24px 0; }
 
-// --- Content ---
 .panel-content {
   display: flex;
   flex-direction: column;
-  gap: $spacing-md;
+  gap: 12px;
 }
 
-// --- Material Card ---
-.material-card {
+.mono-material-card {
   display: flex;
   flex-direction: column;
-  gap: $spacing-sm;
-  padding: $spacing-md;
-  background-color: $color-card-bg;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-  transition: border-color $transition-fast;
+  gap: 8px;
+  padding: 14px;
+  background: var(--surface-card);
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  transition: all 0.15s ease;
 
   &:hover {
-    border-color: rgba($color-accent, 0.3);
+    border-color: #0a0a0a;
   }
 }
 
@@ -329,61 +347,59 @@ watch(() => props.draftPublicId, (newId) => {
 }
 
 .material-label {
-  font-size: $font-size-xs;
-  font-weight: $font-weight-semibold;
-  color: $color-primary;
+  font-size: 11px;
+  font-weight: 600;
+  color: #525252;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .material-text {
-  font-size: $font-size-sm;
-  color: $color-text-primary;
-  line-height: $line-height-relaxed;
+  font-size: 13px;
+  color: #1a1a1a;
+  line-height: 1.6;
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
 
   &--highlight {
-    font-weight: $font-weight-medium;
-    color: $color-primary;
-    padding: $spacing-sm $spacing-md;
-    background-color: rgba($color-primary, 0.04);
-    border-radius: $radius-sm;
-    border-left: 3px solid $color-primary;
+    font-weight: 500;
+    color: #0a0a0a;
+    padding: 10px 14px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    border-left: 3px solid #0a0a0a;
   }
 
   &--suggestion {
-    color: $color-text-secondary;
-    font-size: $font-size-xs;
-    line-height: $line-height-relaxed;
+    color: #525252;
+    font-size: 12px;
+    line-height: 1.6;
   }
 }
 
-// --- Footer ---
 .panel-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: $spacing-sm;
-  border-top: 1px solid $color-divider;
+  padding-top: 10px;
+  border-top: 1px solid #e8e8e8;
 }
 
 .footer-time {
-  font-size: $font-size-xs;
-  color: $color-text-muted;
+  font-size: 12px;
+  color: #d4d4d4;
 }
 
-// --- Responsive ---
-@media (max-width: $breakpoint-sm) {
+@media (max-width: 768px) {
   .panel-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: $spacing-sm;
+    gap: 8px;
   }
 
-  .material-card {
-    padding: $spacing-sm;
+  .mono-material-card {
+    padding: 10px;
   }
 }
 </style>

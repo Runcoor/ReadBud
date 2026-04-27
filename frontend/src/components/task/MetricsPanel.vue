@@ -1,3 +1,9 @@
+<!--
+  Copyright (C) 2026 Leazoot
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  This file is part of ReadBud, licensed under the GNU AGPL v3.
+  See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+-->
 <template>
   <div class="metrics-panel">
     <!-- Header -->
@@ -41,7 +47,7 @@
     <template v-else>
       <!-- KPI Cards -->
       <div class="kpi-grid">
-        <div v-for="kpi in kpis" :key="kpi.key" class="kpi-card">
+        <div v-for="kpi in kpis" :key="kpi.key" class="mono-kpi-card">
           <span class="kpi-label">{{ kpi.label }}</span>
           <span class="kpi-value">{{ formatNumber(kpi.value) }}</span>
           <span
@@ -72,7 +78,7 @@
           :data="tableData"
           stripe
           size="small"
-          class="metrics-table"
+          class="mono-table"
           :max-height="280"
         >
           <el-table-column prop="date" label="日期" width="100" />
@@ -84,7 +90,7 @@
       </div>
 
       <!-- Averages Summary -->
-      <div class="avg-section">
+      <div class="mono-avg-section">
         <div class="avg-item">
           <span class="avg-label">日均阅读</span>
           <span class="avg-value">{{ formatNumber(avgReads) }}</span>
@@ -145,13 +151,13 @@ function updateChart(): void {
     tooltip: {
       trigger: 'axis',
       backgroundColor: '#fff',
-      borderColor: '#E5E7EB',
+      borderColor: '#e8e8e8',
       borderWidth: 1,
-      textStyle: { color: '#1F2937', fontSize: 12 },
+      textStyle: { color: '#0a0a0a', fontSize: 12 },
     },
     legend: {
       bottom: 0,
-      textStyle: { color: '#6B7280', fontSize: 12 },
+      textStyle: { color: '#525252', fontSize: 12 },
       itemWidth: 12,
       itemHeight: 3,
     },
@@ -165,14 +171,14 @@ function updateChart(): void {
     xAxis: {
       type: 'category',
       data: chartDates.value,
-      axisLine: { lineStyle: { color: '#E5E7EB' } },
-      axisLabel: { color: '#9CA3AF', fontSize: 11 },
+      axisLine: { lineStyle: { color: '#e8e8e8' } },
+      axisLabel: { color: '#d4d4d4', fontSize: 11 },
       axisTick: { show: false },
     },
     yAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: '#F0F0F0', type: 'dashed' } },
-      axisLabel: { color: '#9CA3AF', fontSize: 11 },
+      splitLine: { lineStyle: { color: '#f5f5f5', type: 'dashed' } },
+      axisLabel: { color: '#d4d4d4', fontSize: 11 },
     },
     series: [
       {
@@ -182,12 +188,12 @@ function updateChart(): void {
         smooth: true,
         symbol: 'circle',
         symbolSize: 4,
-        lineStyle: { width: 2, color: '#1B3A5C' },
-        itemStyle: { color: '#1B3A5C' },
+        lineStyle: { width: 2, color: '#0a0a0a' },
+        itemStyle: { color: '#0a0a0a' },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(27, 58, 92, 0.12)' },
-            { offset: 1, color: 'rgba(27, 58, 92, 0.01)' },
+            { offset: 0, color: 'rgba(10, 10, 10, 0.1)' },
+            { offset: 1, color: 'rgba(10, 10, 10, 0.01)' },
           ]),
         },
       },
@@ -198,8 +204,8 @@ function updateChart(): void {
         smooth: true,
         symbol: 'circle',
         symbolSize: 4,
-        lineStyle: { width: 2, color: '#5B8DEF' },
-        itemStyle: { color: '#5B8DEF' },
+        lineStyle: { width: 2, color: '#525252' },
+        itemStyle: { color: '#525252' },
       },
       {
         name: '净增粉',
@@ -208,8 +214,8 @@ function updateChart(): void {
         smooth: true,
         symbol: 'circle',
         symbolSize: 4,
-        lineStyle: { width: 2, color: '#52C41A' },
-        itemStyle: { color: '#52C41A' },
+        lineStyle: { width: 2, color: '#22c55e' },
+        itemStyle: { color: '#22c55e' },
       },
     ],
   })
@@ -276,109 +282,124 @@ watch(() => props.articleId, () => {
 .metrics-panel {
   display: flex;
   flex-direction: column;
-  gap: $spacing-base;
+  gap: 16px;
 }
 
-// --- Header ---
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: $spacing-sm;
+  gap: 10px;
 }
 
 .panel-title {
-  font-size: $font-size-md;
-  font-weight: $font-weight-semibold;
-  color: $color-text-primary;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0a0a0a;
   margin: 0;
 }
 
-// --- Loading / Empty ---
-.panel-loading {
-  padding: $spacing-xl 0;
+// Radio buttons
+:deep(.el-radio-button__inner) {
+  background: var(--surface-card) !important;
+  border-color: #e8e8e8 !important;
+  color: #525252 !important;
+  font-size: 12px;
+
+  &:hover {
+    color: #0a0a0a !important;
+  }
 }
 
-.panel-error {
-  padding: $spacing-xl 0;
+:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: #0a0a0a !important;
+  border-color: #0a0a0a !important;
+  color: #fff !important;
+  box-shadow: -1px 0 0 0 #0a0a0a !important;
 }
 
-.panel-empty {
-  padding: $spacing-2xl 0;
-}
+// Loading / Empty
+.panel-loading { padding: 24px 0; }
+.panel-error { padding: 24px 0; }
+.panel-empty { padding: 32px 0; }
 
 .empty-text {
-  font-size: $font-size-sm;
-  color: $color-text-muted;
+  font-size: 13px;
+  color: #d4d4d4;
 }
 
-// --- KPI Grid ---
+:deep(.el-skeleton) { --el-skeleton-color: #f5f5f5; --el-skeleton-to-color: #e8e8e8; }
+:deep(.el-empty__description p) { color: #525252 !important; }
+:deep(.el-result__title) { color: #0a0a0a !important; }
+:deep(.el-result__subtitle) { color: #525252 !important; }
+
+:deep(.el-button--primary) {
+  background: #0a0a0a !important;
+  border-color: #0a0a0a !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+}
+
+// KPI Grid
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: $spacing-md;
+  gap: 12px;
 }
 
-.kpi-card {
+.mono-kpi-card {
   display: flex;
   flex-direction: column;
-  gap: $spacing-xs;
-  padding: $spacing-md;
-  background-color: $color-card-bg;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-  transition: border-color $transition-fast;
+  gap: 4px;
+  padding: 14px;
+  background: var(--surface-card);
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  transition: all 0.15s ease;
 
   &:hover {
-    border-color: rgba($color-accent, 0.3);
+    border-color: #0a0a0a;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   }
 }
 
 .kpi-label {
-  font-size: $font-size-xs;
-  color: $color-text-muted;
+  font-size: 11px;
+  color: #d4d4d4;
   letter-spacing: 0.02em;
 }
 
 .kpi-value {
-  font-size: $font-size-xl;
-  font-weight: $font-weight-bold;
-  color: $color-text-primary;
-  line-height: $line-height-tight;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0a0a0a;
+  line-height: 1.2;
 }
 
 .kpi-trend {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  font-size: $font-size-xs;
-  font-weight: $font-weight-medium;
+  font-size: 12px;
+  font-weight: 500;
 
-  &--up {
-    color: $color-success;
-  }
-
-  &--down {
-    color: $color-error;
-  }
-
-  &--flat {
-    color: $color-text-muted;
-  }
+  &--up { color: #22c55e; }
+  &--down { color: #ef4444; }
+  &--flat { color: #d4d4d4; }
 }
 
-// --- Chart ---
+// Chart
 .chart-section {
   display: flex;
   flex-direction: column;
-  gap: $spacing-sm;
+  gap: 10px;
 }
 
 .section-title {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-semibold;
-  color: $color-text-secondary;
+  font-size: 13px;
+  font-weight: 600;
+  color: #525252;
   margin: 0;
 }
 
@@ -387,97 +408,66 @@ watch(() => props.articleId, () => {
   height: 220px;
 }
 
-// --- Table ---
+// Table
 .table-section {
   display: flex;
   flex-direction: column;
-  gap: $spacing-sm;
+  gap: 10px;
 }
 
-.metrics-table {
-  :deep(.el-table__header th) {
-    background-color: $color-bg;
-    color: $color-text-secondary;
-    font-size: $font-size-xs;
-    font-weight: $font-weight-medium;
-  }
-
-  :deep(.el-table__body td) {
-    font-size: $font-size-sm;
-    color: $color-text-primary;
-  }
+:deep(.el-table) {
+  --el-table-border-color: #e8e8e8;
+  --el-table-header-bg-color: #fafafa;
+  --el-table-row-hover-bg-color: #f5f5f5;
+  th { font-weight: 600 !important; color: #525252 !important; font-size: 12px; }
+  td { font-size: 13px; }
 }
 
-// --- Averages ---
-.avg-section {
+// Averages
+.mono-avg-section {
   display: flex;
   align-items: center;
-  gap: $spacing-xl;
-  padding: $spacing-md;
-  background-color: $color-bg;
-  border-radius: $radius-lg;
+  gap: 28px;
+  padding: 14px;
+  background: var(--surface-card);
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
 }
 
 .avg-item {
   display: flex;
   flex-direction: column;
-  gap: $spacing-xs;
+  gap: 4px;
 }
 
 .avg-divider {
   width: 1px;
   height: 32px;
-  background-color: $color-border;
+  background-color: #e8e8e8;
 }
 
 .avg-label {
-  font-size: $font-size-xs;
-  color: $color-text-muted;
+  font-size: 11px;
+  color: #d4d4d4;
 }
 
 .avg-value {
-  font-size: $font-size-lg;
-  font-weight: $font-weight-semibold;
-  color: $color-primary;
+  font-size: 18px;
+  font-weight: 600;
+  color: #0a0a0a;
 }
 
-// --- Responsive ---
-@media (max-width: $breakpoint-md) {
-  .kpi-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .trend-chart {
-    height: 180px;
-  }
+@media (max-width: 1024px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .trend-chart { height: 180px; }
 }
 
-@media (max-width: $breakpoint-sm) {
-  .panel-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .kpi-value {
-    font-size: $font-size-lg;
-  }
-
-  .trend-chart {
-    height: 160px;
-  }
-
-  .avg-section {
-    flex-direction: column;
-    gap: $spacing-md;
-  }
-
-  .avg-divider {
-    width: 100%;
-    height: 1px;
-  }
+@media (max-width: 768px) {
+  .panel-header { flex-direction: column; align-items: flex-start; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .kpi-value { font-size: 17px; }
+  .trend-chart { height: 160px; }
+  .mono-avg-section { flex-direction: column; gap: 12px; }
+  .avg-divider { width: 100%; height: 1px; }
 }
 </style>

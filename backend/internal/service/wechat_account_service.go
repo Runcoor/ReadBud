@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 package service
 
 import (
@@ -40,12 +45,17 @@ func (s *WechatAccountService) List(ctx context.Context) ([]dto.WechatAccountVO,
 
 // Create creates a new WeChat account.
 func (s *WechatAccountService) Create(ctx context.Context, req dto.WechatAccountRequest) (*dto.WechatAccountVO, error) {
+	delivery := req.DeliveryMode
+	if delivery == "" {
+		delivery = domain.DeliveryModeExtension
+	}
 	acct := domain.WechatAccount{
-		Name:      req.Name,
-		AppID:     req.AppID,
-		TokenMode: req.TokenMode,
-		Status:    domain.StatusActive,
-		Remark:    req.Remark,
+		Name:         req.Name,
+		AppID:        req.AppID,
+		TokenMode:    req.TokenMode,
+		DeliveryMode: delivery,
+		Status:       domain.StatusActive,
+		Remark:       req.Remark,
 	}
 
 	if req.AppSecret != "" {
@@ -85,6 +95,9 @@ func (s *WechatAccountService) Update(ctx context.Context, publicID string, req 
 	acct.Name = req.Name
 	acct.AppID = req.AppID
 	acct.TokenMode = req.TokenMode
+	if req.DeliveryMode != "" {
+		acct.DeliveryMode = req.DeliveryMode
+	}
 	acct.Remark = req.Remark
 
 	if req.AppSecret != "" {
@@ -113,13 +126,18 @@ func (s *WechatAccountService) Update(ctx context.Context, publicID string, req 
 }
 
 func toWechatVO(acct domain.WechatAccount) dto.WechatAccountVO {
+	delivery := acct.DeliveryMode
+	if delivery == "" {
+		delivery = domain.DeliveryModeExtension
+	}
 	return dto.WechatAccountVO{
-		ID:        acct.PublicID,
-		Name:      acct.Name,
-		AppID:     acct.AppID,
-		TokenMode: acct.TokenMode,
-		IsDefault: acct.IsDefault == 1,
-		Status:    acct.Status,
-		Remark:    acct.Remark,
+		ID:           acct.PublicID,
+		Name:         acct.Name,
+		AppID:        acct.AppID,
+		TokenMode:    acct.TokenMode,
+		DeliveryMode: delivery,
+		IsDefault:    acct.IsDefault == 1,
+		Status:       acct.Status,
+		Remark:       acct.Remark,
 	}
 }

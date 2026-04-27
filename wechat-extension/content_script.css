@@ -1,0 +1,59 @@
+/* content_script.css — injected on mp.weixin.qq.com/cgi-bin/appmsg pages.
+ * Kept namespaced under .readbud-* to avoid colliding with WeChat's own CSS. */
+
+.readbud-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 999999;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  font: 500 13px/1 -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.readbud-fab:hover {
+  background: #333;
+  transform: translateY(-1px);
+}
+
+.readbud-fab:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.readbud-fab__icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.readbud-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 88px;
+  z-index: 999998;
+  max-width: 320px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  font: 13px/1.5 -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+  color: #111;
+}
+
+.readbud-toast[data-kind="ok"]  { border-color: #16a34a; }
+.readbud-toast[data-kind="err"] { border-color: #d63d3d; color: #d63d3d; }
+
+.readbud-toast__title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}

@@ -1,3 +1,9 @@
+<!--
+  Copyright (C) 2026 Leazoot
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  This file is part of ReadBud, licensed under the GNU AGPL v3.
+  See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+-->
 <template>
   <div class="publish-panel">
     <!-- Review Status -->
@@ -7,7 +13,7 @@
         <h4 class="section-label">审核状态</h4>
       </div>
       <div v-if="draft" class="review-row">
-        <el-tag :type="reviewTagType" size="small" effect="plain">{{ reviewLabel }}</el-tag>
+        <el-tag :type="reviewTagType" size="small">{{ reviewLabel }}</el-tag>
         <span v-if="draft.quality_score > 0" class="quality-badge">
           <span class="quality-label">质量</span>
           <span class="quality-value" :class="qualityClass">{{ draft.quality_score.toFixed(1) }}</span>
@@ -96,7 +102,7 @@
             <span class="account-name">{{ acc.name }}</span>
             <span class="account-appid">{{ maskAppId(acc.app_id) }}</span>
           </div>
-          <el-tag v-if="acc.is_default" size="small" type="info" effect="plain">默认</el-tag>
+          <el-tag v-if="acc.is_default" size="small" type="info">默认</el-tag>
           <el-icon v-if="selectedAccountId === acc.id" :size="16" class="account-check"><Select /></el-icon>
         </div>
       </div>
@@ -132,7 +138,7 @@
     <!-- Warnings -->
     <div v-if="publishWarnings.length > 0" class="publish-warnings">
       <div v-for="(warn, idx) in publishWarnings" :key="idx" class="warning-item">
-        <el-icon :size="12" color="#FAAD14"><WarningFilled /></el-icon>
+        <el-icon :size="12" color="#eab308"><WarningFilled /></el-icon>
         <span>{{ warn }}</span>
       </div>
     </div>
@@ -172,124 +178,201 @@ function onJobUpdate(updated: PublishJobVO): void {
 .publish-panel {
   display: flex;
   flex-direction: column;
-  gap: $spacing-base;
+  gap: 16px;
 }
 
 .publish-section {
   display: flex;
   flex-direction: column;
-  gap: $spacing-sm;
+  gap: 10px;
 }
 
 .section-header {
   display: flex;
   align-items: center;
-  gap: $spacing-xs;
+  gap: 6px;
 }
 
-.section-icon { color: $color-metal; }
+.section-icon {
+  color: #d4d4d4;
+}
 
 .section-label {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-semibold;
-  color: $color-text-primary;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0a0a0a;
   line-height: 1;
 }
 
 .section-empty {
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-md;
-  background-color: $color-bg;
-  border-radius: $radius-base;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #f5f5f5;
+  border-radius: 8px;
 }
 
-.section-empty-text { font-size: $font-size-xs; color: $color-text-muted; }
-.section-loading { padding: $spacing-xs 0; }
+.section-empty-text {
+  font-size: 12px;
+  color: #d4d4d4;
+}
 
-.review-row { display: flex; align-items: center; gap: $spacing-md; }
+.section-loading {
+  padding: 4px 0;
+}
+
+.review-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
 
 .quality-badge {
   display: inline-flex;
   align-items: center;
-  gap: $spacing-xs;
-  padding: 2px $spacing-sm;
-  background-color: $color-bg;
-  border-radius: $radius-sm;
-  font-size: $font-size-xs;
+  gap: 6px;
+  padding: 2px 10px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-size: 12px;
 }
 
-.quality-label { color: $color-text-muted; }
-.quality-value { font-weight: $font-weight-semibold; }
-.quality--high { color: $color-success; }
-.quality--medium { color: $color-warning; }
-.quality--low { color: $color-error; }
-
-.risk-alert {
-  :deep(.el-alert__title) { font-size: $font-size-xs; font-weight: $font-weight-semibold; }
-  :deep(.el-alert__description) { font-size: $font-size-xs; margin-top: 2px; }
+.quality-label {
+  color: #d4d4d4;
 }
 
-.mode-cards { display: flex; flex-direction: column; gap: $spacing-xs; }
+.quality-value {
+  font-weight: 600;
+}
+
+.quality--high { color: #22c55e; }
+.quality--medium { color: #eab308; }
+.quality--low { color: #ef4444; }
+
+// Alerts
+:deep(.el-alert--error) {
+  background: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
+  border-radius: 8px;
+  .el-alert__title { color: #dc2626 !important; }
+  .el-alert__description { color: #ef4444 !important; }
+}
+
+:deep(.el-alert--warning) {
+  background: #fefce8 !important;
+  border: 1px solid #fde68a !important;
+  border-radius: 8px;
+  .el-alert__title { color: #ca8a04 !important; }
+  .el-alert__description { color: #eab308 !important; }
+}
+
+// Mode cards
+.mode-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 .mode-card {
   display: flex;
   align-items: center;
-  gap: $spacing-md;
-  padding: $spacing-sm $spacing-md;
-  border: 1px solid $color-border;
-  border-radius: $radius-base;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all $transition-fast;
-  background-color: $color-card-bg;
+  transition: all 0.15s ease;
+  background: var(--surface-card);
 
   &:hover:not(.mode-card--disabled) {
-    border-color: $color-accent;
-    background-color: rgba($color-accent, 0.02);
+    border-color: #0a0a0a;
   }
 
   &--active {
-    border-color: $color-accent;
-    background-color: rgba($color-accent, 0.04);
-    .mode-card-icon { color: $color-accent; }
-    .mode-card-title { color: $color-primary; }
+    border-color: #0a0a0a !important;
+    background: #fafafa !important;
+
+    .mode-card-icon { color: #0a0a0a; }
+    .mode-card-title { color: #0a0a0a; font-weight: 600; }
   }
 
-  &--disabled { opacity: 0.5; cursor: not-allowed; }
+  &--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
-.mode-card-icon { flex-shrink: 0; color: $color-metal; transition: color $transition-fast; }
+.mode-card-icon {
+  flex-shrink: 0;
+  color: #d4d4d4;
+  transition: color 0.15s ease;
+}
 
-.mode-card-content { display: flex; flex-direction: column; min-width: 0; }
+.mode-card-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
 
 .mode-card-title {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  color: $color-text-primary;
-  transition: color $transition-fast;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a1a1a;
+  transition: color 0.15s ease;
 }
 
-.mode-card-desc { font-size: $font-size-xs; color: $color-text-muted; line-height: $line-height-tight; }
+.mode-card-desc {
+  font-size: 12px;
+  color: #d4d4d4;
+  line-height: 1.3;
+}
 
-.schedule-section { display: flex; flex-direction: column; gap: $spacing-xs; padding-top: $spacing-sm; }
-.field-label { font-size: $font-size-xs; color: $color-text-secondary; font-weight: $font-weight-medium; }
+.schedule-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: #525252;
+  font-weight: 500;
+}
+
 .schedule-picker { width: 100%; }
-.schedule-hint { font-size: $font-size-xs; color: $color-accent; padding-left: 2px; }
 
-.account-list { display: flex; flex-direction: column; gap: $spacing-xs; }
+.schedule-hint {
+  font-size: 12px;
+  color: #525252;
+  padding-left: 2px;
+}
+
+// Account list
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 .account-item {
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-md;
-  border: 1px solid $color-border;
-  border-radius: $radius-base;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all $transition-fast;
-  &:hover { border-color: $color-accent; }
-  &--selected { border-color: $color-accent; background-color: rgba($color-accent, 0.04); }
+  transition: all 0.15s ease;
+  background: var(--surface-card);
+
+  &:hover { border-color: #0a0a0a; }
+
+  &--selected {
+    border-color: #0a0a0a;
+    background: #fafafa;
+  }
 }
 
 .account-avatar {
@@ -298,65 +381,147 @@ function onJobUpdate(updated: PublishJobVO): void {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: $radius-sm;
-  background-color: $color-primary;
+  border-radius: 8px;
+  background: #0a0a0a;
   color: #fff;
-  font-size: $font-size-xs;
-  font-weight: $font-weight-semibold;
+  font-size: 12px;
+  font-weight: 600;
   flex-shrink: 0;
 }
 
-.account-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.account-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
 
 .account-name {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  color: $color-text-primary;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0a0a0a;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.account-appid { font-size: $font-size-xs; color: $color-text-muted; font-family: 'SF Mono', 'Menlo', monospace; }
-.account-check { flex-shrink: 0; color: $color-accent; }
+.account-appid {
+  font-size: 11px;
+  color: #d4d4d4;
+  font-family: 'SF Mono', 'Menlo', monospace;
+}
 
+.account-check {
+  flex-shrink: 0;
+  color: #0a0a0a;
+}
+
+// Actions
 .action-section {
   display: flex;
-  gap: $spacing-sm;
-  padding-top: $spacing-md;
-  border-top: 1px solid $color-divider;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid #e8e8e8;
 }
 
 .publish-btn { flex: 1; height: 36px; }
-.publish-btn-icon { margin-right: $spacing-xs; }
+.publish-btn-icon { margin-right: 6px; }
 
-.publish-warnings { display: flex; flex-direction: column; gap: $spacing-xs; }
+:deep(.el-button--primary) {
+  background: #0a0a0a !important;
+  border-color: #0a0a0a !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  &:hover { background: #333 !important; border-color: #333 !important; }
+  &:active { transform: scale(0.98); }
+}
+
+:deep(.el-button.is-plain) {
+  background: var(--surface-card) !important;
+  border: 1px solid #e8e8e8 !important;
+  color: #0a0a0a !important;
+  border-radius: 8px !important;
+  &:hover { border-color: #0a0a0a !important; }
+}
+
+// Warnings
+.publish-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 .warning-item {
   display: flex;
   align-items: center;
-  gap: $spacing-xs;
-  font-size: $font-size-xs;
-  color: $color-text-secondary;
-  line-height: $line-height-normal;
+  gap: 6px;
+  font-size: 12px;
+  color: #525252;
+  line-height: 1.4;
 }
 
+// Tag overrides
+:deep(.el-tag) {
+  border-radius: 4px !important;
+  border: none !important;
+}
+:deep(.el-tag--info) { background: #f5f5f5 !important; color: #525252 !important; }
+:deep(.el-tag--success) { background: #f0fdf4 !important; color: #16a34a !important; }
+:deep(.el-tag--danger) { background: #fef2f2 !important; color: #dc2626 !important; }
+:deep(.el-tag--warning) { background: #fefce8 !important; color: #ca8a04 !important; }
+
+:deep(.el-skeleton) {
+  --el-skeleton-color: #f5f5f5;
+  --el-skeleton-to-color: #e8e8e8;
+}
+
+:deep(.el-input__wrapper) {
+  background: var(--surface-card) !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  &:hover { border-color: #d4d4d4 !important; }
+  &.is-focus { border-color: #0a0a0a !important; box-shadow: 0 0 0 2px rgba(10, 10, 10, 0.1) !important; }
+}
+
+:deep(.el-input__inner) {
+  color: #0a0a0a !important;
+  &::placeholder { color: #c4c4c4 !important; }
+}
+
+// Transitions
 .slide-fade-enter-active,
-.slide-fade-leave-active { transition: all $transition-base; }
-.slide-fade-enter-from,
-.slide-fade-leave-to { opacity: 0; transform: translateY(-8px); }
+.slide-fade-leave-active {
+  transition: all 0.2s ease;
+}
 
-@media (max-width: $breakpoint-md) {
-  .mode-card { padding: $spacing-xs $spacing-sm; }
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+@media (max-width: 1024px) {
+  .mode-card { padding: 8px 10px; }
   .mode-card-desc { display: none; }
 }
 
-@media (max-width: $breakpoint-sm) {
-  .publish-panel { gap: $spacing-md; }
-  .mode-cards { flex-direction: row; gap: $spacing-xs; }
-  .mode-card { flex: 1; flex-direction: column; text-align: center; padding: $spacing-sm $spacing-xs; gap: $spacing-xs; }
+@media (max-width: 768px) {
+  .publish-panel { gap: 12px; }
+
+  .mode-cards { flex-direction: row; gap: 6px; }
+
+  .mode-card {
+    flex: 1;
+    flex-direction: column;
+    text-align: center;
+    padding: 10px 6px;
+    gap: 6px;
+  }
+
   .mode-card-desc { display: none; }
-  .account-list { flex-direction: row; overflow-x: auto; gap: $spacing-sm; }
+
+  .account-list { flex-direction: row; overflow-x: auto; gap: 8px; }
   .account-item { min-width: 160px; flex-shrink: 0; }
 }
 </style>

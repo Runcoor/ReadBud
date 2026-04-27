@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 package worker
 
 import (
@@ -27,6 +32,7 @@ import (
 	"readbud/internal/pipeline"
 	"readbud/internal/repository/postgres"
 	"readbud/internal/service"
+	"readbud/internal/service/imageresize"
 	pipelinePkg "readbud/internal/service/pipeline"
 
 	"gorm.io/datatypes"
@@ -181,47 +187,29 @@ func (s *Server) callLLM(ctx context.Context, systemPrompt, userPrompt string, m
 // ---------- Prompt Builder Helpers ----------
 
 var styleSkeletonMap = map[string]string{
-	"minimal": `【本次风格：极简专业型】
-- 开头方式：用一个震撼数据或反常识断言切入
-- 结构：lead → 2-3个section → summary → cta
-- 段落：短段落，高信息密度，每段1-3行
-- 小标题：简短有力，不要像PPT
-- 可用block类型：lead, section, quote, summary, cta`,
+	"minimal": `【本次预设：极简专业型】
+- 设计基因：黑白底色 + 荧光黄高亮，衬线标题 + 等宽编号
+- 开头方式：用一个震撼数据或反常识断言切入；首句尽量保留可被高亮的短语（用 ==…== 标注）
+- 结构：lead → 3-5 个 section（每节 H2 会自动加 mono 编号 01/02/03）→ checklist 或 summary → cta
+- 段落：短段落，高信息密度，每段 1-3 行
+- 小标题：简短有力，4-12 个字
+- 可用 block：lead, section, quote, checklist, summary, cta`,
 
-	"magazine": `【本次风格：杂志编辑型】
-- 开头方式：用一个具体的场景描写或人物故事切入
-- 结构：lead → 3-4个section（穿插quote金句框）→ cta
-- 段落：中长段落，叙事感强，有画面感
-- 小标题：有设计感，体现编辑品味
-- 可用block类型：lead, section, quote, cta`,
+	"magazine": `【本次预设：杂志编辑型】
+- 设计基因：米色纸张底 + 报刊红强调，Bodoni 大字 + 报头报尾
+- 开头方式：用一个具体的场景描写或人物故事切入；首段会渲染为红色首字下沉，请确保首字有意义
+- 结构：lead（首段长一点，至少 3-4 句）→ 4-5 个 section（穿插 quote 金句、可选 summary 作为 FINAL TAKE）→ cta
+- 段落：中长段落，叙事感强，画面感强
+- 小标题：有编辑品味，配合"红色横条 + 大号衬线"，可双行
+- 可用 block：lead, section, quote, summary, cta`,
 
-	"listicle": `【本次风格：清单干货型】
-- 开头方式：用一个痛点提问切入
-- 结构：lead → 3-5个section（穿插checklist清单）→ summary → cta
-- 段落：分点明确，每节有一句总结
-- 小标题：数字序号开头，如"1. xxx"
-- 可用block类型：lead, section, checklist, summary, cta`,
-
-	"narrative": `【本次风格：叙事故事型】
-- 开头方式：用一个具体的人物或场景切入
-- 结构：lead → 3个section（穿插quote）→ cta
-- 段落：长短交替，有故事弧线，有转折
-- 小标题：简洁，服务于叙事节奏
-- 可用block类型：lead, section, quote, cta`,
-
-	"faq": `【本次风格：问答拆解型】
-- 开头方式：直接抛出核心问题
-- 结构：lead → 3-5个section（每个小标题为一个问句）→ summary → cta
-- 段落：问答节奏，每个回答控制在200字内
-- 小标题：必须是问句形式，如"为什么xxx？""xxx怎么办？"
-- 可用block类型：lead, section, summary, cta`,
-
-	"casual": `【本次风格：轻社交型】
-- 开头方式：像朋友圈长文一样，用一句短句切入
-- 结构：lead → 2-3个section（穿插quote金句）→ cta
-- 段落：句子短，留白多，金句多，每段不超过2行
-- 小标题：轻松随意，口语化
-- 可用block类型：lead, section, quote, cta`,
+	"stitch": `【本次预设：暖橙手账型】
+- 设计基因：米色底 + 暖橙强调，居中标题 + 装饰短横
+- 开头方式：用一个轻松的场景或自问切入；lead 段落会被渲染为橙色软底卡片，文字温度要够
+- 结构：lead → 3-5 个 section（H2 居中、配橙色短横）→ checklist 或 quote → cta
+- 段落：节奏舒缓，长短交替；金句单独成段（用 ==…== 标注让其自动渲染为橙色加粗）
+- 小标题：可以是观点句，5-14 个字，避免硬冷术语
+- 可用 block：lead, section, quote, checklist, cta`,
 }
 
 func buildStyleSkeleton(style string) string {
@@ -384,15 +372,12 @@ func (s *Server) handleKeywordExpand(ctx context.Context, t *asynq.Task) error {
 
 		systemPrompt := `你是一个内容研究助手。根据给定的关键词、受众和语气，完成两个任务：
 1. 生成5个搜索查询词，用于搜集相关素材
-2. 根据主题和受众特征，推荐最合适的文章风格
+2. 根据主题和受众特征，从下面三种排版预设里挑一个最合适的
 
-可选风格：
-- minimal：极简专业型，适合知识、行业、B2B内容
-- magazine：杂志编辑型，适合品牌故事、人物、深度观点
-- listicle：清单干货型，适合教程、攻略、经验复盘
-- narrative：叙事故事型，适合案例、转化、品牌温度
-- faq：问答拆解型，适合教育用户、解释复杂概念
-- casual：轻社交型，适合情绪、观点、生活方式
+可选预设（仅这三种）：
+- minimal：极简专业型。黑白底色 + 荧光黄高亮，衬线标题 + 等宽编号，适合技术、AI、产品、知识类深度内容。
+- magazine：杂志编辑型。米色纸张底 + 报刊红强调，Bodoni 大字 + 报头报尾，适合品牌故事、人物专访、文化、深度观点。
+- stitch：暖橙手账型。米色底 + 暖橙强调，居中标题 + 短装饰横线，适合教程、生活方式、观点分享、轻量科普。
 
 返回严格JSON（不要markdown代码块）：
 {"queries": ["query1", "query2", "query3", "query4", "query5"], "recommended_style": "minimal"}`
@@ -798,6 +783,29 @@ func (s *Server) persistImageAsAsset(
 	sourceURL *string,
 	promptText *string,
 ) (string, int64, error) {
+	// WeChat content image API caps each image at 1 MB. Fit the bytes
+	// before they touch storage so the asset row's size matches what we
+	// will actually upload later. Fitting may transcode PNG → JPEG.
+	origSize := len(data)
+	fitted, fittedMime, fitErr := imageresize.FitWeChat(data, adapter.ContentImageMaxBytes)
+	if fitErr != nil {
+		s.logger.Warn("image resize failed; persisting original",
+			zap.String("bucket", bucket),
+			zap.Int("orig_size", origSize),
+			zap.Error(fitErr),
+		)
+	} else {
+		if len(fitted) != origSize {
+			s.logger.Info("image fitted to wechat content image limit",
+				zap.String("bucket", bucket),
+				zap.Int("orig_size", origSize),
+				zap.Int("new_size", len(fitted)),
+				zap.String("new_mime", fittedMime),
+			)
+		}
+		data = fitted
+	}
+
 	mime := http.DetectContentType(data)
 	ext := "png"
 	switch mime {
@@ -1105,14 +1113,46 @@ func (s *Server) handleChartGen(ctx context.Context, t *asynq.Task) error {
 		return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
 	}
 
-	// Skip visual enhance if not enabled
-	if !task.VisualEnhance {
-		s.logger.Info("visual enhance: skipped (disabled)", zap.Int64("task_id", p.TaskID))
+	blocks, err := s.blockRepo.FindByDraftID(ctx, *task.ResultDraftID)
+	if err != nil || len(blocks) == 0 {
 		return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
 	}
 
-	blocks, err := s.blockRepo.FindByDraftID(ctx, *task.ResultDraftID)
-	if err != nil || len(blocks) == 0 {
+	// Always pre-populate per-block html_fragment using the chosen preset's
+	// templates so the frontend preview shows styled HTML even when visual
+	// enhance is off. The LLM rewrite below (visual_enhance=true) overwrites
+	// these baselines with richer markup; image fragments produced by
+	// image_match are preserved.
+	styleName := task.ArticleStyle
+	if !taskDomain.ValidArticleStyles[styleName] {
+		styleName = pipelinePkg.PresetStyleNames()[0]
+	}
+	baselineSC := pipelinePkg.GetStyleConfig(styleName)
+	sectionIdx := 0
+	for i := range blocks {
+		b := &blocks[i]
+		if b.BlockType == draft.BlockTypeSection && b.Heading != nil && strings.TrimSpace(*b.Heading) != "" {
+			sectionIdx++
+		}
+		// Skip blocks that already carry styled HTML (image fragments from image_match).
+		if b.HTMLFragment != nil && strings.TrimSpace(*b.HTMLFragment) != "" {
+			continue
+		}
+		styled := pipelinePkg.CompileBlockStyled(*b, baselineSC, sectionIdx)
+		if strings.TrimSpace(styled) == "" {
+			continue
+		}
+		b.HTMLFragment = &styled
+		if err := s.blockRepo.Update(ctx, b); err != nil {
+			s.logger.Warn("baseline html_fragment save failed", zap.Error(err), zap.Int64("block", b.ID))
+		}
+	}
+
+	// Skip the LLM rewrite if visual enhance is disabled — baselines are enough.
+	if !task.VisualEnhance {
+		s.logger.Info("visual enhance: baselines applied (LLM skipped)",
+			zap.Int64("task_id", p.TaskID),
+			zap.String("style", styleName))
 		return s.enqueueNext(pipeline.TypeHTMLCompile, *p)
 	}
 
@@ -1139,65 +1179,11 @@ func (s *Server) handleChartGen(ctx context.Context, t *asynq.Task) error {
 		}
 	}
 
-	// LLM visual enhancement round
-	// Randomly select a visual style for variety
-	visualStyles := []string{
-		"极简专业：大白底、黑灰正文、一个主色点缀、小标题短促、少装饰",
-		"杂志编辑：标题有设计感、导语单独成块、引用语突出、图片上下留白大",
-		"清单干货：分点明确、每节有总结、序号突出、信息密度高",
-		"叙事温度：柔和配色、段落留白大、引用框温暖、阅读节奏舒缓",
-		"问答拆解：问句醒目、答案区有底色区分、层次清晰",
-		"轻社交风：更像朋友圈长文、句子短、留白多、金句卡片突出",
-	}
-	// Use task ID for deterministic but varied selection
-	styleIdx := int(p.TaskID) % len(visualStyles)
-	selectedStyle := visualStyles[styleIdx]
-
-	enhancePrompt := fmt.Sprintf(`你是一位微信公众号排版设计师。将文章排版优化为适合手机阅读的精美富文本。
-
-本次设计方向：%s
-
-## 设计原则
-- 正文字号15-17px，行高1.6-1.8
-- 一段1-3行，留白充足
-- 颜色不超过3个（主色+辅色+背景色）
-- 强调方式只用1种（加粗或底色高亮，不要混用）
-- 小标题样式统一
-- 模块之间靠留白和分隔线分层
-
-## 允许使用
-- 基础标签：section, h2, h3, p, strong, em, blockquote, ul, ol, li, span, hr
-- 内联style属性
-- 简单linear-gradient背景（2色）
-- border-radius圆角
-- border-left/border-top装饰线
-- background-color色块
-- box-shadow柔和投影
-
-## 禁止使用
-- SVG图标
-- CSS动画(@keyframes)
-- clip-path
-- JavaScript
-- class选择器
-- position:absolute/fixed
-- 嵌套超过3层
-
-## 技术约束
-- 所有样式使用inline style
-- 不要改变文字内容
-- 已有的<img>和<figure>标签保留原样
-
-## 输出格式
-返回严格JSON（不要markdown代码块）：
-{
-  "style_name": "风格名称",
-  "color_scheme": {"primary": "#xxx", "secondary": "#xxx", "bg": "#xxx"},
-  "blocks": [
-    {"index": 0, "html": "该block的完整HTML"},
-    {"index": 1, "html": "..."}
-  ]
-}`, selectedStyle)
+	// LLM visual enhancement round.
+	// The chosen preset (or AI-recommended fallback) maps to a fully specified
+	// design system; we feed those tokens into the prompt so the LLM produces
+	// inline-styled HTML that matches the reference design.
+	enhancePrompt := buildVisualEnhancePrompt(baselineSC)
 
 	enhanceContent, err := s.callLLM(ctx, enhancePrompt, articleSummary.String(), 8192)
 	if err != nil {
@@ -1269,19 +1255,12 @@ func (s *Server) handleHTMLCompile(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	// Load the draft and compile HTML
+	// Load the draft and compile HTML using the chosen preset.
 	task, _ := s.taskSvc.GetByID(ctx, p.TaskID)
 	if task != nil && task.ResultDraftID != nil {
-		d, _ := s.draftRepo.FindByID(ctx, *task.ResultDraftID)
-		if d != nil {
-			blocks, _ := s.blockRepo.FindByDraftID(ctx, d.ID)
-			style := ""
-			if task != nil {
-				style = task.ArticleStyle
-			}
-			html := compileHTML(d.Title, blocks, style)
-			d.CompiledHTML = html
-			s.draftRepo.Update(ctx, d)
+		compiler := pipelinePkg.NewCompilerService(s.draftRepo, s.blockRepo)
+		if _, err := compiler.CompileStyled(ctx, *task.ResultDraftID, task.ArticleStyle); err != nil {
+			s.logger.Warn("html compile failed", zap.Error(err))
 		}
 	}
 
@@ -1358,23 +1337,97 @@ func extractJSON(s string) string {
 	return s[start:]
 }
 
-func compileHTML(title string, blocks []draft.ArticleBlock, styleName string) string {
-	sc := pipelinePkg.GetStyleConfig(styleName)
+// buildVisualEnhancePrompt produces a per-preset prompt that gives the LLM the
+// exact design-system tokens (palette, fonts, decoration policy) and a few
+// gold-standard HTML snippets to imitate per block type.
+func buildVisualEnhancePrompt(sc pipelinePkg.StyleConfig) string {
+	var refSnippets string
+	switch sc.Name {
+	case "magazine":
+		refSnippets = `参考片段（lead 用 drop-cap）：
+<p style="margin:18px 22px;font-size:17px;line-height:1.8;color:#0A0A0A;"><span style="float:left;font-family:'Noto Serif SC',serif;font-weight:900;font-size:60px;line-height:0.9;margin:6px 8px 0 0;color:#E63946;">脑</span>子里有个产品想法，想快速验证一下界面长什么样……</p>
 
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(`<section style="max-width:100%%;padding:0;margin:0;background:%s;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;">`, sc.BgColor))
-	sb.WriteString(fmt.Sprintf(`<h1 style="font-size:24px;font-weight:bold;margin-bottom:16px;color:%s;">%s</h1>`, sc.PrimaryColor, title))
+参考片段（H2 + 红色横条）：
+<div style="margin:34px 22px 14px;"><div style="width:36px;height:4px;background:#E63946;margin-bottom:12px;"></div><h2 style="margin:0;font-family:'Noto Serif SC',serif;font-weight:900;font-size:26px;line-height:1.2;color:#0A0A0A;">章节标题</h2></div>
 
-	for _, b := range blocks {
-		if b.HTMLFragment != nil && *b.HTMLFragment != "" {
-			sb.WriteString(*b.HTMLFragment)
-			continue
-		}
-		sb.WriteString(pipelinePkg.CompileBlockStyled(b, sc))
+参考片段（pull-quote 黑底白字）：
+<blockquote style="margin:24px 14px;padding:22px 24px 22px 52px;background:#0A0A0A;color:#F2EFE8;font-family:'Noto Serif SC',serif;font-weight:600;font-size:18px;line-height:1.6;position:relative;"><span style="position:absolute;left:14px;top:-6px;font-family:'Noto Serif SC',serif;font-size:64px;color:#E63946;line-height:1;">&ldquo;</span>金句正文……</blockquote>`
+	case "stitch":
+		refSnippets = `参考片段（H2 居中 + 短横）：
+<h2 style="margin:36px 20px 8px;font-family:'Noto Serif SC',serif;font-weight:700;font-size:22px;color:#D2691E;text-align:center;">章节标题</h2>
+<div style="width:56px;height:1px;background:#D2691E;opacity:0.4;margin:0 auto 22px;"></div>
+
+参考片段（强调段橙色加粗）：
+<p style="margin:0 20px 22px;color:#D2691E;font-weight:600;font-size:16px;line-height:1.85;">这一段需要醒目，用橙色加粗。</p>
+
+参考片段（输入引用）：
+<div style="margin:22px 12px;padding:18px 20px;background:#FDF2E5;border-left:3px solid #D2691E;border-radius:6px;font-size:14px;line-height:1.85;color:#1A1815;">输入示例……</div>`
+	default: // minimal
+		refSnippets = `参考片段（H2 + mono 编号）：
+<h2 style="margin:36px 24px 14px;font-family:'Noto Serif SC',serif;font-weight:700;font-size:20px;line-height:1.4;color:#111111;display:flex;align-items:baseline;gap:12px;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#888888;letter-spacing:1px;">01</span><span>章节标题</span></h2>
+
+参考片段（黄色高亮 span）：
+<span style="background:linear-gradient(transparent 60%,#FFE94D 60%);padding:0 2px;">需要被强调的短语</span>
+
+参考片段（行内 code）：
+<code style="background:#FAFAFA;color:#111111;padding:1px 6px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:13px;">--global</code>`
 	}
 
-	sb.WriteString("</section>")
-	return sb.String()
+	return fmt.Sprintf(`你是 ReadBud 公众号排版工程师。本次请把每个 block 重排成符合下面预设设计系统的 inline-styled HTML。
+
+# 预设：%s（%s）
+%s
+
+## 设计 token（必须使用）
+- 主底色 paper: %s
+- 面板底色 paperAlt: %s
+- 主文字色 ink: %s
+- 正文色 body: %s
+- 次要色 mute: %s
+- 分隔线 line: %s
+- 强调色 accent: %s
+- 强调底色 accentSoft: %s
+- 衬线字族 serif: %s
+- 无衬线字族 sans: %s
+- 等宽字族 mono: %s
+- H2 装饰策略：%s（minimal=mono编号 / magazine=红色横条 / stitch=居中短横）
+- 导语装饰策略：%s（lead-text=底部细线 / drop-cap=红色首字下沉 / box=橙色底块）
+
+## 排版约束
+- 正文字号 15-17px，行高 1.75-1.85
+- 段落两侧留 22-24px 内边距（margin-left/right），不要顶到屏幕边
+- 配色严格使用上面 8 个 token，禁止引入其它颜色
+- 强调只用 1 种方式：%s 用 ==黄色高亮 span==；%s 用 红色 italic em；%s 用 橙色 bold
+- 不要改变文字内容，不要省略段落
+- 已有的 <img>、<figure>、<svg> 标签必须原样保留
+- 行内 code 保留为 <code>，使用上面的样式
+
+## 严禁
+- class 选择器、id 选择器
+- @keyframes、CSS 动画
+- position:absolute / fixed
+- JavaScript、<script>
+- linear-gradient 之外的 gradient
+- 任意外部字体或图片资源
+
+## 参考片段
+%s
+
+## 输出格式（严格 JSON，不要 markdown 代码块）
+{
+  "style_name": %q,
+  "blocks": [
+    {"index": 0, "html": "对应 block 的完整 HTML，含 inline style"},
+    {"index": 1, "html": "..."}
+  ]
+}`,
+		sc.Name, sc.DisplayName, sc.Description,
+		sc.Paper, sc.PaperAlt, sc.Ink, sc.Body, sc.Mute, sc.Line, sc.Accent, sc.AccentSoft,
+		sc.SerifStack, sc.SansStack, sc.MonoStack,
+		sc.H2Decor, sc.LeadDecor,
+		"minimal", "magazine", "stitch",
+		refSnippets,
+		sc.Name)
 }
 
 func strPtr(s string) *string {

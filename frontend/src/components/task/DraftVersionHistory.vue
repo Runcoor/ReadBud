@@ -1,3 +1,9 @@
+<!--
+  Copyright (C) 2026 Leazoot
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  This file is part of ReadBud, licensed under the GNU AGPL v3.
+  See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+-->
 <template>
   <div class="version-history">
     <div class="version-header">
@@ -37,8 +43,8 @@
         :type="version.id === currentVersionId ? 'primary' : undefined"
       >
         <div
-          class="version-card"
-          :class="{ 'version-card--current': version.id === currentVersionId }"
+          class="glass-version-card"
+          :class="{ 'glass-version-card--current': version.id === currentVersionId }"
         >
           <div class="version-card-header">
             <span class="version-no">v{{ version.version_no }}</span>
@@ -270,90 +276,211 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .version-history {
-  padding: $spacing-base;
+  padding: 16px;
 }
 
 .version-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: $spacing-lg;
+  margin-bottom: 20px;
 }
 
 .version-title {
-  font-size: $font-size-md;
-  font-weight: $font-weight-semibold;
-  color: $color-text-primary;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
   margin: 0;
 }
 
 .version-loading,
 .version-error {
-  padding: $spacing-lg 0;
+  padding: 20px 0;
 }
 
 .version-error {
   display: flex;
   flex-direction: column;
-  gap: $spacing-sm;
+  gap: 10px;
   align-items: flex-start;
 }
 
+// Glass timeline overrides
 .version-timeline {
-  padding-left: $spacing-xs;
+  padding-left: 4px;
+
+  :deep(.el-timeline-item__tail) {
+    border-left: 2px solid rgba(255, 255, 255, 0.1);
+  }
+
+  :deep(.el-timeline-item__node) {
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+  }
+
+  :deep(.el-timeline-item__node--primary) {
+    background: #6366f1;
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.3);
+  }
+
+  :deep(.el-timeline-item__timestamp) {
+    color: rgba(255, 255, 255, 0.3) !important;
+    font-size: 12px;
+  }
 }
 
-.version-card {
-  background: $color-card-bg;
-  border: 1px solid $color-border;
-  border-radius: $radius-base;
-  padding: $spacing-md;
-  transition: border-color $transition-fast;
+// Glass version card
+.glass-version-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px;
+  transition: all 0.15s ease;
 
   &:hover {
-    border-color: $color-accent;
+    border-color: rgba(99, 102, 241, 0.3);
+    background: rgba(255, 255, 255, 0.06);
   }
 
   &--current {
-    border-color: $color-accent;
-    background: rgba($color-accent, 0.03);
+    border-color: rgba(99, 102, 241, 0.4);
+    background: rgba(99, 102, 241, 0.06);
   }
 }
 
 .version-card-header {
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
-  margin-bottom: $spacing-xs;
+  gap: 10px;
+  margin-bottom: 6px;
 }
 
 .version-no {
-  font-size: $font-size-sm;
-  font-weight: $font-weight-semibold;
-  color: $color-primary;
+  font-size: 13px;
+  font-weight: 600;
+  color: #818cf8;
 }
 
 .version-card-title {
-  font-size: $font-size-base;
-  color: $color-text-primary;
-  margin: 0 0 $spacing-xs 0;
-  line-height: $line-height-normal;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 4px 0;
+  line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .version-card-reason {
-  font-size: $font-size-xs;
-  color: $color-text-muted;
-  margin: 0 0 $spacing-sm 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  margin: 0 0 10px 0;
 }
 
 .version-card-actions {
   display: flex;
-  gap: $spacing-xs;
+  gap: 6px;
 }
 
+// Glass tag overrides
+:deep(.el-tag) {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+
+:deep(.el-tag.el-tag--success ) {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    color: #10b981 !important;
+  }
+}
+
+// Glass button overrides
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #6366f1, #818cf8) !important;
+  border: 1px solid rgba(99, 102, 241, 0.5) !important;
+  color: #fff !important;
+  border-radius: 10px !important;
+  &:hover {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3) !important;
+  }
+}
+
+:deep(.el-button--warning) {
+  color: #f59e0b !important;
+}
+
+// Glass skeleton
+:deep(.el-skeleton) {
+  --el-skeleton-color: rgba(255, 255, 255, 0.06);
+  --el-skeleton-to-color: rgba(255, 255, 255, 0.12);
+}
+
+// Glass empty
+:deep(.el-empty__description p) {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+// Glass alert
+:deep(.el-alert) {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
+  border-radius: 10px;
+  .el-alert__title {
+    color: #ef4444 !important;
+  }
+}
+
+// Glass dialog
+:deep(.el-dialog) {
+  background: rgba(15, 15, 30, 0.95) !important;
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5) !important;
+
+  .el-dialog__header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 20px 24px;
+  }
+
+  .el-dialog__title {
+    color: #fff !important;
+    font-weight: 600;
+  }
+
+  .el-dialog__body {
+    padding: 24px;
+  }
+
+  .el-dialog__footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 16px 24px;
+  }
+}
+
+// Glass form
+:deep(.el-form-item__label) {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+:deep(.el-textarea__inner) {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: none !important;
+  border-radius: 10px !important;
+  color: #fff !important;
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.3) !important;
+  }
+}
+
+:deep(.el-divider) {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+// Preview content
 .preview-content {
   max-height: 500px;
   overflow-y: auto;
@@ -361,59 +488,63 @@ onMounted(() => {
 
 .preview-meta {
   p {
-    margin: 0 0 $spacing-xs 0;
-    font-size: $font-size-base;
-    color: $color-text-primary;
-    line-height: $line-height-relaxed;
+    margin: 0 0 6px 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.6;
+
+    strong {
+      color: rgba(255, 255, 255, 0.5);
+    }
   }
 }
 
 .preview-blocks {
   display: flex;
   flex-direction: column;
-  gap: $spacing-md;
+  gap: 12px;
 }
 
 .preview-block {
-  padding: $spacing-md;
-  border: 1px solid $color-border;
-  border-radius: $radius-sm;
-  background: $color-bg;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .block-type-tag {
-  margin-bottom: $spacing-xs;
+  margin-bottom: 6px;
 }
 
 .block-heading {
-  font-size: $font-size-md;
-  font-weight: $font-weight-semibold;
-  color: $color-text-primary;
-  margin: $spacing-xs 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  margin: 6px 0;
 }
 
 .block-text {
-  font-size: $font-size-base;
-  color: $color-text-secondary;
-  line-height: $line-height-relaxed;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.6;
   margin: 0;
   white-space: pre-wrap;
 }
 
 .preview-loading {
-  padding: $spacing-lg;
+  padding: 20px;
 }
 
 // Responsive
-@media (max-width: $breakpoint-sm) {
+@media (max-width: 768px) {
   .version-history {
-    padding: $spacing-sm;
+    padding: 10px;
   }
 
   .version-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: $spacing-sm;
+    gap: 10px;
   }
 }
 </style>

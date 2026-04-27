@@ -1,9 +1,22 @@
-import { get, patch } from './request'
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
+import { get, patch, post } from './request'
 import type { ApiResponse } from '@/types/api'
-import type { DraftVO, BlockVO, SourceVO } from '@/types/draft'
+import type { DraftVO, BlockVO, SourceVO, CoverVO } from '@/types/draft'
 
 export function getDraft(id: string): Promise<ApiResponse<DraftVO>> {
   return get<ApiResponse<DraftVO>>(`/drafts/${id}`)
+}
+
+export function getDraftCover(id: string): Promise<ApiResponse<CoverVO | null>> {
+  return get<ApiResponse<CoverVO | null>>(`/drafts/${id}/cover`)
+}
+
+export function regenerateDraftCover(id: string): Promise<ApiResponse<CoverVO>> {
+  return post<ApiResponse<CoverVO>>(`/drafts/${id}/cover/regenerate`)
 }
 
 export function updateDraft(

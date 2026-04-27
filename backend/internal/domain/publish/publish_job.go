@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 package publish
 
 import (
@@ -28,11 +33,19 @@ func (PublishJob) TableName() string {
 }
 
 // Publish job status constants.
+//
+// Status flow by delivery mode:
+//
+//	api:       queued -> submitting -> polling -> success | failed | cancelled
+//	extension: awaiting_extension -> success (when extension reports back) | cancelled
+//	manual:    awaiting_manual    -> success (user clicks "已发布")        | cancelled
 const (
-	JobStatusQueued     = "queued"
-	JobStatusSubmitting = "submitting"
-	JobStatusPolling    = "polling"
-	JobStatusSuccess    = "success"
-	JobStatusFailed     = "failed"
-	JobStatusCancelled  = "cancelled"
+	JobStatusQueued            = "queued"
+	JobStatusSubmitting        = "submitting"
+	JobStatusPolling           = "polling"
+	JobStatusSuccess           = "success"
+	JobStatusFailed            = "failed"
+	JobStatusCancelled         = "cancelled"
+	JobStatusAwaitingExtension = "awaiting_extension"
+	JobStatusAwaitingManual    = "awaiting_manual"
 )

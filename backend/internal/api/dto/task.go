@@ -1,3 +1,8 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 package dto
 
 import "time"
@@ -13,7 +18,7 @@ type CreateTaskRequest struct {
 	PublishMode     string     `json:"publish_mode" binding:"required,oneof=manual now schedule"`
 	PublishAt       *time.Time `json:"publish_at,omitempty"`
 	WechatAccountID *string    `json:"wechat_account_id,omitempty" binding:"omitempty,min=1,max=64"`
-	ArticleStyle    string     `json:"article_style" binding:"omitempty,oneof=minimal magazine listicle narrative faq casual"`
+	ArticleStyle    string     `json:"article_style" binding:"omitempty,oneof=minimal magazine stitch"`
 	VisualEnhance   *bool      `json:"visual_enhance"`
 	BrandProfileID  *string    `json:"brand_profile_id,omitempty"`
 }

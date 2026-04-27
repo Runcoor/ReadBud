@@ -1,9 +1,15 @@
+// Copyright (C) 2026 Leazoot
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// This file is part of ReadBud, licensed under the GNU AGPL v3.
+// See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
 package service
 
 import (
 	"context"
 	"fmt"
 
+	"readbud/internal/adapter"
 	"readbud/internal/domain/draft"
 	"readbud/internal/repository/postgres"
 )
@@ -61,20 +67,27 @@ type DraftService struct {
 	blockRepo  postgres.ArticleBlockRepository
 	sourceRepo postgres.SourceDocumentRepository
 	taskRepo   postgres.TaskRepository
+	assetRepo  postgres.AssetRepository
+	storage    adapter.StorageProvider
 }
 
-// NewDraftService creates a new DraftService.
+// NewDraftService creates a new DraftService. assetRepo and storage may be nil for
+// tests / lightweight contexts; if nil, DraftVO.CoverURL will simply be omitted.
 func NewDraftService(
 	draftRepo postgres.ArticleDraftRepository,
 	blockRepo postgres.ArticleBlockRepository,
 	sourceRepo postgres.SourceDocumentRepository,
 	taskRepo postgres.TaskRepository,
+	assetRepo postgres.AssetRepository,
+	storage adapter.StorageProvider,
 ) *DraftService {
 	return &DraftService{
 		draftRepo:  draftRepo,
 		blockRepo:  blockRepo,
 		sourceRepo: sourceRepo,
 		taskRepo:   taskRepo,
+		assetRepo:  assetRepo,
+		storage:    storage,
 	}
 }
 
@@ -260,12 +273,33 @@ func (s *DraftService) toVO(d *draft.ArticleDraft, blocks []draft.ArticleBlock, 
 		UpdatedAt:       d.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
+	if url := s.resolveCoverURL(context.Background(), d); url != "" {
+		vo.CoverURL = &url
+	}
+
 	vo.Blocks = make([]BlockVO, 0, len(blocks))
 	for i := range blocks {
 		vo.Blocks = append(vo.Blocks, *s.blockToVO(&blocks[i]))
 	}
 
 	return vo
+}
+
+// resolveCoverURL looks up the cover asset and returns its public storage URL, or
+// "" if no cover is linked or any lookup fails (cover is non-critical metadata).
+func (s *DraftService) resolveCoverURL(ctx context.Context, d *draft.ArticleDraft) string {
+	if d == nil || d.CoverAssetID == nil || s.assetRepo == nil || s.storage == nil {
+		return ""
+	}
+	a, err := s.assetRepo.FindByID(ctx, *d.CoverAssetID)
+	if err != nil || a == nil {
+		return ""
+	}
+	url, err := s.storage.GetURL(ctx, a.Bucket, a.ObjectKey)
+	if err != nil {
+		return ""
+	}
+	return url
 }
 
 func (s *DraftService) blockToVO(b *draft.ArticleBlock) *BlockVO {

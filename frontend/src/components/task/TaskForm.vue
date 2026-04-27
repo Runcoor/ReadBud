@@ -1,3 +1,9 @@
+<!--
+  Copyright (C) 2026 Leazoot
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  This file is part of ReadBud, licensed under the GNU AGPL v3.
+  See LICENSE in the project root or <https://www.gnu.org/licenses/agpl-3.0.html>.
+-->
 <template>
   <el-form
     ref="formRef"
@@ -39,15 +45,30 @@
         </el-select>
       </el-form-item>
 
-      <el-form-item label="文章风格">
-        <el-select v-model="form.article_style" placeholder="自动推荐（留空由AI选择）" class="w-full" clearable>
-          <el-option
+      <el-form-item label="排版预设">
+        <div class="style-grid">
+          <button
+            type="button"
+            class="style-card"
+            :class="{ active: form.article_style === '' }"
+            @click="form.article_style = ''"
+          >
+            <span class="style-name">自动推荐</span>
+            <span class="style-detail">交给 AI 根据主题与受众自动挑一种。</span>
+          </button>
+          <button
             v-for="(label, key) in ARTICLE_STYLE_LABELS"
             :key="key"
-            :label="label"
-            :value="key"
-          />
-        </el-select>
+            type="button"
+            class="style-card"
+            :class="[`style-card--${key}`, { active: form.article_style === key }]"
+            @click="form.article_style = key as ArticleStyle"
+          >
+            <span class="style-swatch"><span /><span /><span /></span>
+            <span class="style-name">{{ label }}</span>
+            <span class="style-detail">{{ ARTICLE_STYLE_DETAILS[key as ArticleStyle] }}</span>
+          </button>
+        </div>
       </el-form-item>
 
       <el-form-item label="目标字数" prop="target_words">
@@ -100,9 +121,9 @@
         <el-select v-model="form.brand_profile_id" placeholder="默认品牌" class="w-full" clearable>
           <el-option
             v-for="bp in brandProfiles"
-            :key="bp.id"
+            :key="bp.public_id || bp.id"
             :label="bp.name"
-            :value="bp.id"
+            :value="bp.public_id || String(bp.id)"
           />
         </el-select>
       </el-form-item>
@@ -158,7 +179,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { CreateTaskRequest, ImageMode, PublishMode, ArticleStyle } from '@/types/task'
-import { IMAGE_MODE_LABELS, PUBLISH_MODE_LABELS, ARTICLE_STYLE_LABELS } from '@/types/task'
+import { IMAGE_MODE_LABELS, PUBLISH_MODE_LABELS, ARTICLE_STYLE_LABELS, ARTICLE_STYLE_DETAILS } from '@/types/task'
 import { listBrandProfiles } from '@/api/brand'
 import type { BrandProfileVO } from '@/types/brand'
 
@@ -437,6 +458,81 @@ async function handleSubmit(): Promise<void> {
     &.is-active {
       color: var(--text-primary) !important;
     }
+  }
+}
+
+.style-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.style-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--border-light);
+  background: var(--surface-bg);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  font-family: inherit;
+  color: var(--text-primary);
+
+  &:hover {
+    border-color: var(--text-primary);
+  }
+
+  &.active {
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 2px rgba(10, 10, 10, 0.06);
+  }
+
+  .style-swatch {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 2px;
+
+    span {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+  }
+
+  &--minimal .style-swatch span:nth-child(1) { background: #ffffff; }
+  &--minimal .style-swatch span:nth-child(2) { background: #111111; }
+  &--minimal .style-swatch span:nth-child(3) { background: #ffe94d; }
+
+  &--magazine .style-swatch span:nth-child(1) { background: #f2efe8; }
+  &--magazine .style-swatch span:nth-child(2) { background: #0a0a0a; }
+  &--magazine .style-swatch span:nth-child(3) { background: #e63946; }
+
+  &--stitch .style-swatch span:nth-child(1) { background: #fcfaf5; }
+  &--stitch .style-swatch span:nth-child(2) { background: #fdf2e5; }
+  &--stitch .style-swatch span:nth-child(3) { background: #d2691e; }
+
+  .style-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+
+  .style-detail {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+}
+
+@media (max-width: 768px) {
+  .style-grid {
+    grid-template-columns: 1fr;
   }
 }
 
