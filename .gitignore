@@ -64,6 +64,7 @@ backend/configs/config.yaml
 CLAUDE.md
 GEMINI.md
 AGENTS.md
+app_spec.txt
 
 # Internal docs (not part of the published project)
 /docs/
